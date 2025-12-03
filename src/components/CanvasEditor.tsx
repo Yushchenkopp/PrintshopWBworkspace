@@ -4,9 +4,10 @@ import * as fabric from 'fabric';
 interface CanvasEditorProps {
     onCanvasReady: (canvas: fabric.Canvas) => void;
     logicalHeight?: number; // Optional prop to control logical height
+    children?: React.ReactNode;
 }
 
-export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logicalHeight = 800 }) => {
+export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logicalHeight = 800, children }) => {
     const canvasEl = useRef<HTMLCanvasElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const canvasInstance = useRef<fabric.Canvas | null>(null);
@@ -379,6 +380,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
                 // but 'auto' or default usually uses bilinear/bicubic.
                 // User requested "image-rendering: high-quality".
                 />
+                {children}
             </div>
         </div>
     );

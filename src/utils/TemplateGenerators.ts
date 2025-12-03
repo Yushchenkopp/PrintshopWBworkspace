@@ -1,10 +1,10 @@
 import * as fabric from 'fabric';
 
 // --- НАСТРОЙКИ ГЕОМЕТРИИ (Синхронизировано с CanvasEditor: 2400px) ---
-const SCALE_FACTOR = 3; // 3x Resolution for sharpness
-const FULL_WIDTH = 800 * SCALE_FACTOR;
-const PADDING_SIDE = 40 * SCALE_FACTOR;
-const CONTENT_WIDTH = FULL_WIDTH - (PADDING_SIDE * 2);
+export const SCALE_FACTOR = 3; // 3x Resolution for sharpness
+export const FULL_WIDTH = 800 * SCALE_FACTOR;
+export const PADDING_SIDE = 40 * SCALE_FACTOR;
+export const CONTENT_WIDTH = FULL_WIDTH - (PADDING_SIDE * 2);
 
 export type TemplateType = 'collage' | 'polaroid' | 'papa' | 'baby' | 'jersey' | 'constructor';
 
@@ -100,46 +100,55 @@ export const generateCollageTemplate = async (
 ): Promise<number> => {
     if (!canvas) return 800;
 
+    const count = images.length;
+
+    // 1. PREPARE LAYOUT DATA (Synchronous)
+    let colLayout: number[] = [];
+
+    if (count === 0) {
+        // EMPTY STATE: No columns, just prepare for Header/Footer rendering
+        colLayout = [];
+    } else {
+        switch (count) {
+            case 1: colLayout = [1]; break;
+            case 2: colLayout = [1, 1]; break;
+            case 3: colLayout = [1, 1, 1]; break;
+            case 4: colLayout = [2, 2]; break;
+            case 5: colLayout = [2, 1, 2]; break;
+            case 6: colLayout = [2, 2, 2]; break;
+            case 7: colLayout = [2, 3, 2]; break;
+            case 8: colLayout = [3, 2, 3]; break;
+            case 9: colLayout = [3, 3, 3]; break;
+            default: {
+                colLayout = [Math.ceil(count / 3), Math.round(count / 3), Math.floor(count / 3)];
+                let sum = colLayout.reduce((a, b) => a + b, 0);
+                while (sum < count) { colLayout[0]++; sum++; }
+                while (sum > count) { colLayout[0]--; sum--; }
+                break;
+            }
+        }
+    }
+
+    // 2. PRE-LOAD ALL IMAGES (Asynchronous)
+    // We load them into fabric objects but don't add to canvas yet.
+    const loadedImagesPromises = images.map(async (imgData) => {
+        const imgUrl = (typeof imgData === 'object' && imgData.url) ? imgData.url : imgData;
+        if (!imgUrl) return null;
+        return await loadImage(imgUrl);
+    });
+
+    const loadedImages = await Promise.all(loadedImagesPromises);
+
+    // 3. CRITICAL SECTION: CLEAR AND RENDER (Synchronous as possible)
+    // Now that we have all heavy assets, we clear and rebuild instantly.
     canvas.clear();
     canvas.backgroundColor = 'transparent';
 
-    const count = images.length;
-    if (count === 0) {
-        canvas.requestRenderAll();
-        return 800;
-    }
-
-    // 1. КАРТА КОЛОНОК (Column Layout)
-    // Массив задает количество фото в каждом столбце
-    let colLayout: number[] = [];
-
-    switch (count) {
-        case 1: colLayout = [1]; break;
-        case 2: colLayout = [1, 1]; break; // 2 столбца по 1 фото
-        case 3: colLayout = [1, 1, 1]; break; // 3 столбца по 1 фото
-        case 4: colLayout = [2, 2]; break; // 2 столбца по 2 фото
-        case 5: colLayout = [2, 1, 2]; break; // 2-1-2
-        case 6: colLayout = [2, 2, 2]; break; // 3 столбца по 2 фото
-        case 7: colLayout = [2, 3, 2]; break; // 2-3-2
-        case 8: colLayout = [3, 2, 3]; break; // 3-2-3
-        case 9: colLayout = [3, 3, 3]; break; // 3-3-3
-        default:
-            // Если > 9, делим на 3 столбца равномерно
-            colLayout = [Math.ceil(count / 3), Math.round(count / 3), Math.floor(count / 3)];
-            // Корректировка суммы (простой вариант, можно улучшить)
-            let sum = colLayout.reduce((a, b) => a + b, 0);
-            while (sum < count) { colLayout[0]++; sum++; }
-            while (sum > count) { colLayout[0]--; sum--; }
-            break;
-    }
-
-    // 2. ЗАГОЛОВОК (Dual Layer: Fill + Outline)
+    // --- HEADER ---
     const headerTop = 60 * SCALE_FACTOR;
-    const headerGap = -15 * SCALE_FACTOR; // Even tighter spacing
-
-    // Common styles for header
+    const headerGap = -15 * SCALE_FACTOR;
     const headerStyle = {
-        fontFamily: 'Arial Black, Arial, sans-serif', // Arial Black requested
+        fontFamily: 'Arial Black, Arial, sans-serif',
         fontWeight: '900',
         fill: textColor,
         originX: 'center' as const,
@@ -149,222 +158,178 @@ export const generateCollageTemplate = async (
         textAlign: 'center'
     };
 
-    // Line 1: Filled
     const headerText1 = new fabric.IText(headerTextValue, {
         ...headerStyle,
         top: headerTop,
-        name: 'header-1' // Tag for updates
+        name: 'header-1'
     });
 
-    // FIXED HEIGHT LOGIC
-    // We want the header to always be a specific height, regardless of text length.
-    // We also want it to fill the width.
-    const TARGET_HEADER_HEIGHT = 100 * SCALE_FACTOR; // Fixed height in pixels
-
-    const scaleX = CONTENT_WIDTH / headerText1.width!;
-    const scaleY = TARGET_HEADER_HEIGHT / headerText1.height!;
+    const TARGET_HEADER_HEIGHT = 100 * SCALE_FACTOR;
+    const headerScaleX = CONTENT_WIDTH / headerText1.width!;
+    const headerScaleY = TARGET_HEADER_HEIGHT / headerText1.height!;
 
     headerText1.set({
-        scaleX: scaleX,
-        scaleY: scaleY,
+        scaleX: headerScaleX,
+        scaleY: headerScaleY,
         left: FULL_WIDTH / 2
     });
-
     canvas.add(headerText1);
 
-    // Calculate height of first line to position second line
     const line1Height = headerText1.height! * headerText1.scaleY!;
     const line2Top = headerTop + line1Height + headerGap;
 
-    // Line 2: Outlined
     const headerText2 = new fabric.IText(headerTextValue, {
         ...headerStyle,
         top: line2Top,
         fill: 'transparent',
         stroke: textColor,
-        strokeWidth: 1.5, // Reverted to 1.5 (scaling handled by object scale)
-        name: 'header-2' // Tag for updates
+        strokeWidth: 1.5,
+        name: 'header-2'
     });
 
-    // Apply same scaling
     headerText2.set({
-        scaleX: scaleX,
-        scaleY: scaleY,
+        scaleX: headerScaleX,
+        scaleY: headerScaleY,
         left: FULL_WIDTH / 2
     });
-
     canvas.add(headerText2);
 
-    // 3. РАСЧЕТ СЕТКИ
+    // --- GRID CALCULATION ---
     const line2Height = headerText2.height! * headerText2.scaleY!;
-    const gridTop = line2Top + line2Height + (5 * SCALE_FACTOR); // Minimal gap to collage
-    const gap = 0; // GAPLESS (без отступов)
-
-    // Calculate Footer Top (Pre-calculation to find available grid height)
-    // We need to know how much space the footer takes.
-    // GRID HEIGHT based on Cell Aspect Ratio
-    // The user wants the CELLS to match the aspect ratio (e.g. 1:1 square cells).
-    // Exception: Columns with fewer photos stretch to fill the grid height.
-
-    // 1. Find max photos in a column
-    const maxPhotosInCol = Math.max(...colLayout);
-
-    // 2. Calculate column width
-    const numCols = colLayout.length;
-    const colWidth = CONTENT_WIDTH / numCols;
+    const gridTop = line2Top + line2Height;
 
     // 3. Calculate Grid Height
     // If a column has `maxPhotosInCol` photos, each photo should have height = colWidth / aspectRatio.
-    // So total grid height = maxPhotosInCol * (colWidth / aspectRatio).
-    const gridHeight = maxPhotosInCol * (colWidth / aspectRatio);
 
+    // 2. Calculate column width
+    const numCols = colLayout.length;
+    const colWidth = numCols > 0 ? CONTENT_WIDTH / numCols : 0; // Avoid division by zero
+
+    let gridHeight = 0;
+    if (count === 0) {
+        gridHeight = CONTENT_WIDTH; // Default Square Placeholder Height
+    } else {
+        // 1. Find max photos in a column
+        const maxPhotosInCol = colLayout.length > 0 ? Math.max(...colLayout) : 0;
+        gridHeight = maxPhotosInCol * (colWidth / aspectRatio);
+    }
+
+    // --- RENDER IMAGES ---
     let imageIndex = 0;
-
-    // 4. ОТРИСОВКА ПО КОЛОНКАМ
     for (let col = 0; col < numCols; col++) {
         const photosInCol = colLayout[col];
-        const photoHeight = gridHeight / photosInCol; // Высота фото в этой колонке
-
+        const photoHeight = gridHeight / photosInCol;
         const colLeft = PADDING_SIDE + (col * colWidth);
 
         for (let row = 0; row < photosInCol; row++) {
-            if (imageIndex >= images.length) break;
+            if (imageIndex >= loadedImages.length) break;
 
-            const imgData = images[imageIndex];
-            const imgUrl = (typeof imgData === 'object' && imgData.url) ? imgData.url : imgData;
+            const img = loadedImages[imageIndex];
+            if (img) {
+                // Apply Filters
+                const filters = [];
+                if (isBW) filters.push(new fabric.filters.Grayscale());
+                if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness: brightness }));
 
-            if (imgUrl) {
-                const img = await loadImage(imgUrl);
+                img.filters = filters;
+                img.applyFilters();
 
-                if (img) {
-                    // Apply Filters
-                    const filters = [];
-                    if (isBW) {
-                        filters.push(new fabric.filters.Grayscale());
-                    }
-                    if (brightness !== 0) {
-                        filters.push(new fabric.filters.Brightness({ brightness: brightness }));
-                    }
+                const left = colLeft + (colWidth / 2);
+                const top = gridTop + (row * photoHeight) + (photoHeight / 2);
 
-                    img.filters = filters;
-                    img.applyFilters();
+                // FIX: Add small overlap to prevent 1px gaps
+                const OVERLAP = 2;
 
-                    // Центр ячейки
-                    const left = colLeft + (colWidth / 2);
-                    const top = gridTop + (row * photoHeight) + (photoHeight / 2);
+                const scaleX = (colWidth + OVERLAP) / img.width!;
+                const scaleY = (photoHeight + OVERLAP) / img.height!;
+                const scale = Math.max(scaleX, scaleY);
 
-                    // Масштабирование (Object-Fit: Cover)
-                    const scaleX = colWidth / img.width!;
-                    const scaleY = photoHeight / img.height!;
-                    const scale = Math.max(scaleX, scaleY);
-
-                    img.set({
+                img.set({
+                    left: left,
+                    top: top,
+                    originX: 'center',
+                    originY: 'center',
+                    scaleX: scale,
+                    scaleY: scale,
+                    clipPath: new fabric.Rect({
                         left: left,
                         top: top,
+                        width: colWidth + OVERLAP,
+                        height: photoHeight + OVERLAP,
                         originX: 'center',
                         originY: 'center',
-                        scaleX: scale,
-                        scaleY: scale,
-                        // Clip Path (Absolute Positioning)
-                        clipPath: new fabric.Rect({
-                            left: left, // Absolute center X of cell
-                            top: top,   // Absolute center Y of cell
-                            width: colWidth,
-                            height: photoHeight,
-                            originX: 'center',
-                            originY: 'center',
-                            absolutePositioned: true
-                        }),
-                        strokeWidth: 0,
-                        cornerColor: 'white',
-                        borderColor: '#000',
-                        transparentCorners: false,
-                        perPixelTargetFind: true, // Only select if clicking on visible pixels (respects clipPath)
-                    });
+                        absolutePositioned: true
+                    }),
+                    strokeWidth: 0,
+                    cornerColor: 'white',
+                    borderColor: '#000',
+                    transparentCorners: false,
+                    perPixelTargetFind: true,
+                    selectable: true // Ensure images are selectable
+                });
 
-                    // Отключаем лишние контролы
-                    img.setControlsVisibility({
-                        mt: false, mb: false, ml: false, mr: false
-                    });
-
-                    canvas.add(img);
-                }
+                img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                canvas.add(img);
             }
             imageIndex++;
         }
     }
 
-    // 5. ФУТЕР
-    const footerMarginTop = 15 * SCALE_FACTOR; // Decreased slightly (25 -> 15)
+    // --- FOOTER ---
+    const footerMarginTop = 15 * SCALE_FACTOR;
     const footerTop = gridTop + gridHeight + footerMarginTop;
 
-    // 5.1 Barcode (Left, 35% width)
+    // Barcode
     const barcodeWidth = CONTENT_WIDTH * 0.35;
-    const barcodeHeight = 70 * SCALE_FACTOR; // Adjusted height (80 -> 70)
+    const barcodeHeight = 70 * SCALE_FACTOR;
     const barcode = createBarcode(barcodeWidth, barcodeHeight, textColor);
-
-    // Offset barcode down to align with visual top of text (Cap Height)
     const barcodeOffsetY = 10 * SCALE_FACTOR;
-
-    barcode.set({
-        left: PADDING_SIDE,
-        top: footerTop + barcodeOffsetY
-    });
+    barcode.set({ left: PADDING_SIDE, top: footerTop + barcodeOffsetY });
     canvas.add(barcode);
 
-    // 5.2 Name (Right, max 55% width)
-    const nameText = createText(footerTextValue, 60 * SCALE_FACTOR, 'normal'); // Increased font size (50 -> 60)
-
-    // Offset Name slightly down relative to Barcode
-    const nameOffsetY = 0; // Moved up by 4px (was 4 * SCALE_FACTOR)
-
+    // Name
+    const nameText = createText(footerTextValue, 60 * SCALE_FACTOR, 'normal');
     nameText.set({
-        name: 'footer-name', // Add tag for updates
-        fontFamily: 'Arial Black', // Requested font
-        fill: textColor, // Black color
+        name: 'footer-name',
+        fontFamily: 'Arial Black',
+        fill: textColor,
         originX: 'right',
-        originY: 'top', // Align top with barcode
+        originY: 'top',
         left: FULL_WIDTH - PADDING_SIDE,
-        top: footerTop + nameOffsetY
+        top: footerTop
     });
-
-    // Auto-scale Name
     const maxNameWidth = CONTENT_WIDTH * 0.55;
     if (nameText.width! > maxNameWidth) {
         const scale = maxNameWidth / nameText.width!;
         nameText.set({ scaleX: scale, scaleY: scale });
     }
-
     canvas.add(nameText);
 
-    // 5.3 Date (Below Barcode, max 70% of barcode width)
+    // Date
     const dateString = isSince ? `since ${footerDateValue}` : footerDateValue;
-    const dateText = createText(dateString, 24 * SCALE_FACTOR, 'bold'); // Smaller font for date
-
-    const dateTop = footerTop + barcodeOffsetY + barcodeHeight + (5 * SCALE_FACTOR); // 5px gap below barcode
-
+    const dateText = createText(dateString, 24 * SCALE_FACTOR, 'bold');
+    const dateTop = footerTop + barcodeOffsetY + barcodeHeight + (5 * SCALE_FACTOR);
     dateText.set({
-        name: 'footer-date', // Add tag for updates
+        name: 'footer-date',
         fill: textColor,
         originX: 'left',
         originY: 'top',
         left: PADDING_SIDE,
         top: dateTop
     });
-
-    // Force width to ALWAYS be 70% of barcode width
     const targetDateWidth = barcodeWidth * 0.7;
     if (dateText.width) {
         const scale = targetDateWidth / dateText.width;
         dateText.set({ scaleX: scale, scaleY: scale });
     }
-
     canvas.add(dateText);
 
-    // 6. ИТОГОВАЯ ВЫСОТА
-    // Need to include date height
-    const dateHeight = dateText.height! * (dateText.scaleY || 1);
-    const totalHeight = dateTop + dateHeight + (40 * SCALE_FACTOR); // Add some bottom padding
+    // Final Render
+    // Use a fixed height for the date area to prevent layout jumps when toggling 'since'
+    // The date text scales, but we reserve a constant space for it.
+    const FIXED_DATE_HEIGHT = 30 * SCALE_FACTOR;
+    const totalHeight = dateTop + FIXED_DATE_HEIGHT + (40 * SCALE_FACTOR);
+
     canvas.requestRenderAll();
     return totalHeight;
 };
