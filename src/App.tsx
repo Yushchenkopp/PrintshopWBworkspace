@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CollageWorkspace } from './components/workspaces/CollageWorkspace';
+import { PolaroidWorkspace } from './components/workspaces/PolaroidWorkspace';
 import { type TemplateType } from './utils/TemplateGenerators';
 
 function App() {
@@ -17,17 +18,7 @@ function App() {
       )}
 
       {template === 'polaroid' && (
-        <div className="flex h-full items-center justify-center bg-zinc-50">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-zinc-300 mb-4">Polaroid Mode</h2>
-            <button
-              onClick={() => setTemplate('collage')}
-              className="px-4 py-2 bg-zinc-900 text-white rounded-lg text-sm"
-            >
-              Back to Collage
-            </button>
-          </div>
-        </div>
+        <PolaroidWorkspace onSwitchTemplate={handleSwitchTemplate} />
       )}
     </div>
   );
