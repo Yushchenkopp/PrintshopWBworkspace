@@ -93,7 +93,7 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
         // 2. Reset Viewport to Identity
         canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
         canvas.discardActiveObject();
-        canvas.requestRenderAll();
+        // canvas.requestRenderAll(); // Removed to prevent flicker
 
         // 3. Calculate Bounding Box
         let minX = Infinity;
@@ -159,18 +159,17 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
             height: cropHeight
         });
 
+        // Restore Viewport IMMEDIATELY (before async yield)
+        if (originalViewport) {
+            canvas.setViewportTransform(originalViewport);
+        }
+
         // Convert Base64 to Blob
         const response = await fetch(dataURL);
         let blob = await response.blob();
 
         // 7. Inject DPI Metadata
         blob = await setDpi(blob, 200);
-
-        // 8. Restore Viewport
-        if (originalViewport) {
-            canvas.setViewportTransform(originalViewport);
-        }
-        canvas.requestRenderAll();
 
         // 9. Download
         const url = URL.createObjectURL(blob);

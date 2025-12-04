@@ -33,8 +33,10 @@ const TEMPLATE_URL = '/templates/polaroids-bg.png';
 
 export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
-    const [images, setImages] = useState<{ id: string; url: string }[]>([]);
+    // Fixed 2 slots for Polaroid: [Left, Right]
+    const [images, setImages] = useState<({ id: string; url: string } | null)[]>([null, null]);
     const [isReady, setIsReady] = useState(false);
+    const templateRef = React.useRef<fabric.Image | null>(null);
     // Calibrated slots coordinates
     const slots = [
         { x: 18, y: 22, w: 534, h: 477 },
@@ -51,11 +53,12 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
         c.renderAll();
     }, []);
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetSlotIndex?: number) => {
         if (e.target.files) {
             const files = Array.from(e.target.files);
-            const newImages: { id: string; url: string }[] = [];
 
+            // Process files first
+            const processedImages: { id: string; url: string }[] = [];
             for (const file of files) {
                 let imageUrl: string;
                 if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
@@ -67,14 +70,42 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 } else {
                     imageUrl = URL.createObjectURL(file);
                 }
-                newImages.push({ id: crypto.randomUUID(), url: imageUrl });
+                processedImages.push({ id: crypto.randomUUID(), url: imageUrl });
             }
-            setImages((prev) => [...prev, ...newImages]);
+
+            setImages((prev) => {
+                const newSlots = [...prev];
+                let currentFileIndex = 0;
+
+                // 1. If targetSlotIndex is provided, try to fill that specific slot first
+                if (targetSlotIndex !== undefined && targetSlotIndex !== null && targetSlotIndex < newSlots.length) {
+                    if (processedImages[currentFileIndex]) {
+                        newSlots[targetSlotIndex] = processedImages[currentFileIndex];
+                        currentFileIndex++;
+                    }
+                }
+
+                // 2. Fill remaining empty slots with remaining files
+                for (let i = 0; i < newSlots.length; i++) {
+                    if (currentFileIndex >= processedImages.length) break;
+                    if (newSlots[i] === null) {
+                        newSlots[i] = processedImages[currentFileIndex];
+                        currentFileIndex++;
+                    }
+                }
+
+                return newSlots;
+            });
+
+            // Clear input value to allow re-uploading the same file
+            e.target.value = '';
         }
     };
 
-    const handleRemoveImage = (id: string) => setImages(prev => prev.filter(img => img.id !== id));
-    const handleClearCanvas = () => setImages([]);
+    const handleRemoveImage = (id: string) => {
+        setImages(prev => prev.map(img => (img && img.id === id) ? null : img));
+    };
+    const handleClearCanvas = () => setImages([null, null]);
 
     // DND Kit Sensors
     const sensors = useSensors(
@@ -86,9 +117,29 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
         const { active, over } = event;
         if (active.id !== over?.id) {
             setImages((items) => {
-                const oldIndex = items.findIndex((item) => item.id === active.id);
-                const newIndex = items.findIndex((item) => item.id === over?.id);
-                return arrayMove(items, oldIndex, newIndex);
+                // We need to handle nulls. 
+                // Since sidebar only shows non-nulls, we are reordering the non-null items?
+                // Or are we swapping slots?
+                // For simplicity, let's just swap the slots if we can find them.
+                // But DND kit works on the filtered list.
+                // Let's just map the filtered list back to slots? 
+                // Actually, if we have fixed slots, dragging in sidebar might be confusing if we don't visualize slots.
+                // Let's assume sidebar reordering just re-fills the slots in new order.
+
+                const currentNonNulls = items.filter((i): i is { id: string; url: string } => i !== null);
+                const oldIndex = currentNonNulls.findIndex((item) => item.id === active.id);
+                const newIndex = currentNonNulls.findIndex((item) => item.id === over?.id);
+
+                const reordered = arrayMove(currentNonNulls, oldIndex, newIndex);
+
+                // Now put them back into slots. 
+                // Strategy: Fill slots from left to right with reordered items.
+                // Any remaining slots become null.
+                const newSlots: ({ id: string; url: string } | null)[] = [null, null];
+                for (let i = 0; i < 2; i++) {
+                    if (reordered[i]) newSlots[i] = reordered[i];
+                }
+                return newSlots;
             });
         }
     };
@@ -98,44 +149,49 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
         if (!canvas) return;
 
         const renderPolaroid = async () => {
-            canvas.clear();
-            // canvas.backgroundColor = 'transparent'; // Already set
+            const bottomLayer: fabric.Object[] = []; // Photos & Placeholders
+            const topLayer: fabric.Object[] = [];    // Text
 
             try {
-                const templateImg = await fabric.Image.fromURL(TEMPLATE_URL, {
-                    crossOrigin: 'anonymous'
-                });
+                let templateImg = templateRef.current;
+                if (!templateImg) {
+                    templateImg = await fabric.Image.fromURL(TEMPLATE_URL, {
+                        crossOrigin: 'anonymous'
+                    });
+                    templateRef.current = templateImg;
+                }
 
                 // Scale template to fit canvas width (assuming 1200 logical width)
                 // We'll scale it to fit nicely.
                 const canvasWidth = 1200;
+                const LOGICAL_CANVAS_WIDTH = 2400; // From CanvasEditor
+                const LOGICAL_CANVAS_HEIGHT = 1200; // From JSX
+                const OFFSET_X = (LOGICAL_CANVAS_WIDTH - canvasWidth) / 2;
+
                 const scale = canvasWidth / templateImg.width!;
                 templateImg.scale(scale);
 
+                const scaledHeight = templateImg.height! * scale;
+                const OFFSET_Y = (LOGICAL_CANVAS_HEIGHT - scaledHeight) / 2;
+
                 // Center the template
                 templateImg.set({
-                    left: 0,
-                    top: 0,
+                    left: OFFSET_X,
+                    top: OFFSET_Y,
                     selectable: false,
                     evented: false,
                 });
 
-                // --- PRODUCTION MODE ---
-                // Render Images/Placeholders First (Bottom)
-                const activeImages = images.slice(0, 2);
+                // --- PRE-LOAD CONTENT ---
+                // activeImages is just images (fixed 2 slots)
+                const activeImages = images;
 
-                // We need 2 slots.
-                // Aggressive adjustment based on user feedback.
-                // Define Windows (Approximate positions based on standard Polaroid layout)
-                // Adjusted based on visual feedback (screenshot)
-                // The previous guess was too small and off-center.
-                // Assuming the template is roughly symmetrical.
-
+                // 1. Prepare Images & Placeholders
                 for (let i = 0; i < 2; i++) {
                     const slot = slots[i];
                     // Adjust for scale (slots are already in canvas coords now)
-                    const slotX = slot.x;
-                    const slotY = slot.y;
+                    const slotX = slot.x + OFFSET_X;
+                    const slotY = slot.y + OFFSET_Y;
                     const slotW = slot.w;
                     const slotH = slot.h;
 
@@ -158,28 +214,28 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         // Slot Center = SlotX + SlotW/2
                         // Left + Width/2 = SlotX + SlotW/2
                         // Left = SlotX + SlotW/2 - Width/2
-                        const imgWidth = img.getScaledWidth();
-                        const imgHeight = img.getScaledHeight();
 
-                        const initialLeft = slotX + (slotW - imgWidth) / 2;
-                        const initialTop = slotY + (slotH - imgHeight) / 2;
+
+
 
                         // Create Clip Path (The Slot)
                         const clipPath = new fabric.Rect({
-                            left: slotX,
-                            top: slotY,
+                            left: slotX + slotW / 2,
+                            top: slotY + slotH / 2,
                             width: slotW,
                             height: slotH,
+                            originX: 'center',
+                            originY: 'center',
                             absolutePositioned: true,
                         });
 
                         img.set({
                             selectable: true,
                             evented: true,
-                            originX: 'left',   // CHANGED: Use Top/Left for simpler math
-                            originY: 'top',    // CHANGED: Use Top/Left for simpler math
-                            left: initialLeft,
-                            top: initialTop,
+                            originX: 'center',
+                            originY: 'center',
+                            left: slotX + slotW / 2,
+                            top: slotY + slotH / 2,
                             clipPath: clipPath,
                             hasControls: true,
                             hasBorders: true,
@@ -191,73 +247,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                             borderScaleFactor: 2,
                         });
 
-                        // Constraint Logic: STRICT HARD WALL
-                        const constrainImage = () => {
-                            const currentWidth = img.getScaledWidth();
-                            const currentHeight = img.getScaledHeight();
-
-                            // Limits
-                            const minLeft = slotX + slotW - currentWidth;
-                            const maxLeft = slotX;
-                            const minTop = slotY + slotH - currentHeight;
-                            const maxTop = slotY;
-
-                            // Clamp
-                            let newLeft = img.left!;
-                            let newTop = img.top!;
-
-                            if (currentWidth >= slotW) {
-                                newLeft = Math.min(Math.max(newLeft, minLeft), maxLeft);
-                            } else {
-                                newLeft = slotX + (slotW - currentWidth) / 2;
-                            }
-
-                            if (currentHeight >= slotH) {
-                                newTop = Math.min(Math.max(newTop, minTop), maxTop);
-                            } else {
-                                newTop = slotY + (slotH - currentHeight) / 2;
-                            }
-
-                            img.set({ left: newLeft, top: newTop });
-                        };
-
-                        // Apply initially
-                        constrainImage();
-
-                        // Apply on EVERY move frame
-                        img.on('moving', constrainImage);
-
-                        // Apply on scaling
-                        img.on('scaling', () => {
-                            const currentScaleX = slotW / img.width!;
-                            const currentScaleY = slotH / img.height!;
-                            const minScale = Math.max(currentScaleX, currentScaleY);
-
-                            if (img.scaleX < minScale || img.scaleY < minScale) {
-                                img.scale(minScale);
-                            }
-                            constrainImage();
-                        });
-
-                        canvas.add(img);
-
-                        // --- DEBUG: VISUALIZE SLOTS ---
-                        // Adding a red border to show where the code thinks the window is.
-                        // This helps verify if the coordinates (18, 22, etc.) are correct.
-                        const debugRect = new fabric.Rect({
-                            left: slotX,
-                            top: slotY,
-                            width: slotW,
-                            height: slotH,
-                            fill: 'transparent',
-                            stroke: 'red',
-                            strokeWidth: 2,
-                            selectable: false,
-                            evented: false,
-                            opacity: 0.5
-                        });
-                        canvas.add(debugRect);
-                        // -----------------------------
+                        bottomLayer.push(img);
 
                     } else {
                         // Placeholder
@@ -283,33 +273,113 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
                         const group = new fabric.Group([placeholder, text], {
                             selectable: false,
+                            evented: true, // Explicitly enable events
                             hoverCursor: 'pointer'
                         });
 
                         group.on('mousedown', () => {
-                            document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+                            // Trigger specific input for this slot
+                            document.getElementById(`polaroid-upload-${i}`)?.click();
                         });
-                        canvas.add(group);
-
-                        // DEBUG for Placeholder too
-                        const debugRect = new fabric.Rect({
-                            left: slotX,
-                            top: slotY,
-                            width: slotW,
-                            height: slotH,
-                            fill: 'transparent',
-                            stroke: 'red',
-                            strokeWidth: 2,
-                            selectable: false,
-                            evented: false,
-                            opacity: 0.5
-                        });
-                        canvas.add(debugRect);
+                        bottomLayer.push(group);
                     }
                 }
 
-                // Add Template on Top
+                // 2. Prepare Text Fields
+                const textDefaults = [
+                    "Интересно, когда я вырасту,\nкто будет моей женой?",
+                    "Я буду!"
+                ];
+
+                for (let i = 0; i < 2; i++) {
+                    const slot = slots[i];
+                    // Adjust for scale and offset
+                    const slotX = slot.x + OFFSET_X;
+                    const slotY = slot.y + OFFSET_Y;
+                    const slotW = slot.w;
+                    const slotH = slot.h;
+
+                    const textTop = slotY + slotH; // Higher, directly under photo
+
+                    let textLeft: number;
+                    let originX: 'center' | 'right' | 'left';
+                    let textAlign: 'center' | 'right' | 'left';
+                    let fontSize: number;
+
+                    if (i === 0) {
+                        // First polaroid: Centered
+                        textLeft = slotX + slotW / 2;
+                        originX = 'center';
+                        textAlign = 'center';
+                        fontSize = 44;
+                    } else {
+                        // Second polaroid: Right aligned with padding
+                        textLeft = slotX + slotW - 30; // Shifted left from edge
+                        originX = 'right';
+                        textAlign = 'right';
+                        fontSize = 55; // Bigger font
+                    }
+
+                    // Use Textbox for auto-wrapping
+                    const text = new fabric.Textbox(textDefaults[i], {
+                        left: textLeft,
+                        top: textTop,
+                        width: slotW - 20, // Wider to fit text in 2 lines
+                        fontFamily: 'Caveat',
+                        fontSize: fontSize,
+                        fill: '#27272a',
+                        originX: originX,
+                        originY: 'top',
+                        textAlign: textAlign,
+                        lineHeight: 0.8,
+                        selectable: false, // Disable selection/movement
+                        evented: false, // Disable events
+                        editable: false,
+                        splitByGrapheme: false,
+                        hasControls: false,
+                        lockRotation: true,
+                        lockScalingX: true,
+                        lockScalingY: true,
+                        lockMovementX: true,
+                        lockMovementY: true,
+                    });
+
+                    // Constraints (simplified for static text, but kept for consistency)
+                    const paperBottom = slotY + slotH + 220;
+                    const paperLeft = slotX;
+                    const paperRight = slotX + slotW;
+                    const minTop = slotY + slotH;
+
+                    // Constraints removed for static text to prevent accidental shifts
+                    // The initial position is calculated correctly above.
+
+                    topLayer.push(text);
+
+                    topLayer.push(text);
+                }
+
+                // --- SYNCHRONOUS SWAP ---
+                // 1. Remove everything
+                canvas.remove(...canvas.getObjects());
+
+                // 2. Add Bottom Layer (Photos/Placeholders)
+                canvas.add(...bottomLayer);
+
+                // 3. Add Template
                 canvas.add(templateImg);
+
+                // 4. Add Top Layer (Text)
+                canvas.add(...topLayer);
+
+                canvas.requestRenderAll();
+                // Explicit Deselection Handler for Polaroid
+                // (CanvasEditor handles this, but adding here ensures specific behavior for this mode if needed)
+                canvas.on('mouse:down', (e) => {
+                    if (!e.target) {
+                        canvas.discardActiveObject();
+                        canvas.requestRenderAll();
+                    }
+                });
 
                 canvas.requestRenderAll();
 
@@ -357,37 +427,60 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ФОТО</h2>
                         <label className="p-1.5 bg-zinc-100/50 hover:bg-zinc-200/50 rounded-lg cursor-pointer transition-colors text-zinc-600">
                             <Upload className="w-3.5 h-3.5" />
-                            <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageUpload} />
+                            <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => {
+                                handleImageUpload(e);
+                            }} />
                         </label>
                     </div>
-                    {images.length === 0 ? (
+                    {images.every(img => img === null) ? (
                         <label className="border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
-                            <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageUpload} />
+                            <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => {
+                                handleImageUpload(e);
+                            }} />
                             <ImagePlus className="w-8 h-8 text-zinc-300 mb-2 group-hover:text-zinc-400 transition-colors" />
                             <span className="text-sm font-medium text-zinc-600">Загрузить фото</span>
                         </label>
                     ) : (
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                            <SortableContext items={images.map(img => img.id)} strategy={rectSortingStrategy}>
+                            <SortableContext items={images.filter((i): i is { id: string; url: string } => i !== null).map(img => img.id)} strategy={rectSortingStrategy}>
                                 <div className="grid grid-cols-4 gap-2">
                                     {images.map((img, idx) => (
-                                        <SortablePhoto
-                                            key={img.id}
-                                            id={img.id}
-                                            url={img.url}
-                                            index={idx + 1}
-                                            onRemove={() => handleRemoveImage(img.id)}
-                                        />
+                                        img ? (
+                                            <SortablePhoto
+                                                key={img.id}
+                                                id={img.id}
+                                                url={img.url}
+                                                index={idx + 1}
+                                                onRemove={() => handleRemoveImage(img.id)}
+                                            />
+                                        ) : null
                                     ))}
                                 </div>
                             </SortableContext>
                         </DndContext>
                     )}
-                    {images.length > 0 && (
+                    {images.some(img => img !== null) && (
                         <button onClick={handleClearCanvas} className="mt-8 text-xs text-zinc-400 font-medium flex items-center gap-1 hover:bg-red-50 hover:text-red-600 rounded-md px-2 py-1 cursor-pointer">
                             <Trash2 className="w-3 h-3" /> Очистить всё
                         </button>
                     )}
+                    {/* Dedicated inputs for each slot to guarantee correct targeting */}
+                    <input
+                        id="polaroid-upload-0"
+                        type="file"
+                        className="hidden"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 0)}
+                    />
+                    <input
+                        id="polaroid-upload-1"
+                        type="file"
+                        className="hidden"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 1)}
+                    />
                 </section>
             </aside>
 
