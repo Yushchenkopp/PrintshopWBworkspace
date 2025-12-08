@@ -41,6 +41,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const [brightness, setBrightness] = useState<number>(0);
     const [aspectRatio, setAspectRatio] = useState<number>(1);
     const [logicalCanvasHeight, setLogicalCanvasHeight] = useState<number>(800);
+    const [headerLines, setHeaderLines] = useState<number>(2);
 
     const [originalValues, setOriginalValues] = useState<{
         header: string; name: string; date: string;
@@ -137,7 +138,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
         imagesJson: '[]',
         aspectRatio: 1,
         isBWEnabled: true,
-        brightness: 0
+        brightness: 0,
+        headerLines: 2
     });
 
     const lastDateRef = useRef('05.09.2025');
@@ -150,7 +152,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
 
                     const isStructureChanged =
                         currentImagesJson !== prevPropsRef.current.imagesJson ||
-                        aspectRatio !== prevPropsRef.current.aspectRatio;
+                        aspectRatio !== prevPropsRef.current.aspectRatio ||
+                        headerLines !== prevPropsRef.current.headerLines;
 
                     const isFilterChanged =
                         isBWEnabled !== prevPropsRef.current.isBWEnabled ||
@@ -159,7 +162,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     if (isStructureChanged || images.length === 0) { // Force render if empty to show placeholder
                         // Full Re-render
                         const imageUrls = images.map(img => img.url);
-                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness);
+                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines);
                         setLogicalCanvasHeight(newHeight);
 
                         // Reveal canvas after first render and layout adjustment
@@ -171,7 +174,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         updateCollageFilters(canvas, isBWEnabled, brightness);
                     } else {
                         // Smart Update (Text Only)
-                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor);
+                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines);
                     }
 
                     // Update refs
@@ -179,7 +182,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         imagesJson: currentImagesJson,
                         aspectRatio,
                         isBWEnabled,
-                        brightness
+                        brightness,
+                        headerLines
                     };
                 } catch (error) {
                     console.error("Error rendering template:", error);
@@ -187,7 +191,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness]);
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines]);
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -268,12 +272,23 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
 
                 <section>
                     <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-3">ФОРМАТ</h2>
-                    <div className="bg-zinc-100 p-1 rounded-lg grid grid-cols-4 gap-1 mb-4">
+                    <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-4">
+                        {/* Sliding Indicator */}
+                        <div
+                            className="absolute top-1 bottom-1 w-[calc(25%-4px)] bg-white rounded-[6px] shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                            style={{
+                                left: Math.abs(aspectRatio - 1) < 0.01 ? '4px' :
+                                    Math.abs(aspectRatio - 0.75) < 0.01 ? 'calc(25% + 2px)' :
+                                        Math.abs(aspectRatio - 0.8) < 0.01 ? 'calc(50% + 0px)' :
+                                            'calc(75% - 2px)'
+                            }}
+                        />
+
                         {[{ label: '1:1', value: 1 }, { label: '3:4', value: 3 / 4 }, { label: '4:5', value: 4 / 5 }, { label: '5:7', value: 5 / 7 }].map((ratio) => (
                             <button
                                 key={ratio.label}
                                 onClick={() => setAspectRatio(ratio.value)}
-                                className={`py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${Math.abs(aspectRatio - ratio.value) < 0.01 ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+                                className={`flex-1 relative z-10 text-[13px] font-medium transition-colors duration-200 ${Math.abs(aspectRatio - ratio.value) < 0.01 ? 'text-black' : 'text-[#8E8E93]'}`}
                             >
                                 {ratio.label}
                             </button>
@@ -310,6 +325,30 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                     <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[18px]' : 'left-0.5'}`} />
                                 </button>
                             </div>
+                        </div>
+                    </div>
+
+
+                    <div className="mb-4">
+                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">ЗАГОЛОВОК</h2>
+                        <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px]">
+                            {/* Sliding Indicator */}
+                            <div
+                                className="absolute top-1 bottom-1 w-[calc(33.33%-4px)] bg-white rounded-[6px] shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                                style={{
+                                    left: headerLines === 1 ? '4px' : headerLines === 2 ? 'calc(33.33% + 2px)' : 'calc(66.66% + 0px)'
+                                }}
+                            />
+
+                            {[1, 2, 3].map((val) => (
+                                <button
+                                    key={val}
+                                    onClick={() => setHeaderLines(val)}
+                                    className={`flex-1 relative z-10 text-[13px] font-medium transition-colors duration-200 ${headerLines === val ? 'text-black' : 'text-[#8E8E93]'}`}
+                                >
+                                    {val}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -413,7 +452,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                     width: '2160px', // CONTENT_WIDTH
                                     height: '2160px', // Square
                                     left: '300px', // PADDING_SIDE (120) + CANVAS_PADDING (180)
-                                    top: '915px'
+                                    top: `${660 + (headerLines - 1) * 255}px`
                                 }}
                             >
                                 <ImagePlus className="w-48 h-48 text-zinc-300 mb-8 group-hover:text-zinc-500 transition-colors duration-500" />

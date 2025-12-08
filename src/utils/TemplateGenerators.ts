@@ -86,6 +86,7 @@ const createBarcode = (width: number, height: number, color: string = '#000000')
 };
 
 // Функция теперь возвращает Promise<number> (Высоту макета)
+// Функция теперь возвращает Promise<number> (Высоту макета)
 export const generateCollageTemplate = async (
     canvas: any,
     images: any[],
@@ -96,7 +97,8 @@ export const generateCollageTemplate = async (
     isBW: boolean = false,
     isSince: boolean = true,
     textColor: string = '#000000',
-    brightness: number = 0
+    brightness: number = 0,
+    headerLines: number = 2
 ): Promise<number> => {
     if (!canvas) return 800;
 
@@ -158,6 +160,7 @@ export const generateCollageTemplate = async (
         textAlign: 'center'
     };
 
+    // LINE 1 (Filled)
     const headerText1 = new fabric.IText(headerTextValue, {
         ...headerStyle,
         top: headerTop,
@@ -176,27 +179,56 @@ export const generateCollageTemplate = async (
     canvas.add(headerText1);
 
     const line1Height = headerText1.height! * headerText1.scaleY!;
-    const line2Top = headerTop + line1Height + headerGap;
+    let currentTop = headerTop + line1Height;
 
-    const headerText2 = new fabric.IText(headerTextValue, {
-        ...headerStyle,
-        top: line2Top,
-        fill: 'transparent',
-        stroke: textColor,
-        strokeWidth: 1.5,
-        name: 'header-2'
-    });
+    // LINE 2 (Outline)
+    if (headerLines >= 2) {
+        const line2Top = currentTop + headerGap;
+        const headerText2 = new fabric.IText(headerTextValue, {
+            ...headerStyle,
+            top: line2Top,
+            fill: 'transparent',
+            stroke: textColor,
+            strokeWidth: 1.5,
+            name: 'header-2'
+        });
 
-    headerText2.set({
-        scaleX: headerScaleX,
-        scaleY: headerScaleY,
-        left: FULL_WIDTH / 2
-    });
-    canvas.add(headerText2);
+        headerText2.set({
+            scaleX: headerScaleX,
+            scaleY: headerScaleY,
+            left: FULL_WIDTH / 2
+        });
+        canvas.add(headerText2);
+
+        const line2Height = headerText2.height! * headerText2.scaleY!;
+        currentTop = line2Top + line2Height;
+    }
+
+    // LINE 3 (Outline)
+    if (headerLines >= 3) {
+        const line3Top = currentTop + headerGap;
+        const headerText3 = new fabric.IText(headerTextValue, {
+            ...headerStyle,
+            top: line3Top,
+            fill: 'transparent',
+            stroke: textColor,
+            strokeWidth: 1.5,
+            name: 'header-3'
+        });
+
+        headerText3.set({
+            scaleX: headerScaleX,
+            scaleY: headerScaleY,
+            left: FULL_WIDTH / 2
+        });
+        canvas.add(headerText3);
+
+        const line3Height = headerText3.height! * headerText3.scaleY!;
+        currentTop = line3Top + line3Height;
+    }
 
     // --- GRID CALCULATION ---
-    const line2Height = headerText2.height! * headerText2.scaleY!;
-    const gridTop = line2Top + line2Height;
+    const gridTop = currentTop;
 
     // 3. Calculate Grid Height
     // If a column has `maxPhotosInCol` photos, each photo should have height = colWidth / aspectRatio.
@@ -341,7 +373,8 @@ export const updateCollageHeader = (
     footerTextValue: string,
     footerDateValue: string,
     isSince: boolean,
-    textColor: string
+    textColor: string,
+    headerLines: number // New param for compatibility
 ) => {
     if (!canvas) return;
 
@@ -349,32 +382,47 @@ export const updateCollageHeader = (
     // const CONTENT_WIDTH = FULL_WIDTH - (PADDING_SIDE * 2); 
 
     // 1. UPDATE HEADER
-    const header1 = canvas.getObjects().find((obj: any) => obj.name === 'header-1');
-    const header2 = canvas.getObjects().find((obj: any) => obj.name === 'header-2');
+    const headers = [
+        canvas.getObjects().find((obj: any) => obj.name === 'header-1'),
+        canvas.getObjects().find((obj: any) => obj.name === 'header-2'),
+        canvas.getObjects().find((obj: any) => obj.name === 'header-3')
+    ];
 
-    // Always update color
-    if (header1) header1.set({ fill: textColor });
-    if (header2) header2.set({ stroke: textColor });
+    const TARGET_HEADER_HEIGHT = 100 * SCALE_FACTOR;
 
-    if (header1 && header2 && header1.text !== headerTextValue) {
-        header1.set({ text: headerTextValue });
-        header2.set({ text: headerTextValue });
+    headers.forEach((header, index) => {
+        if (!header) return;
 
-        // Recalculate Header Scale using the object itself
-        // Reset scale to 1 to get natural dimensions
-        header1.set({ scaleX: 1, scaleY: 1 });
+        // Ensure visibility based on headerLines? 
+        // No, structural changes should trigger generateCollageTemplate.
+        // updateCollageHeader is for fast text updates.
+        // But we can double check visibility just in case.
+        // Actually, if we switch lines, we re-render. 
+        // Here we just update text for existing objects.
 
-        const currentWidth = header1.width!;
-        const currentHeight = header1.height!;
+        // Update Color
+        if (index === 0) {
+            header.set({ fill: textColor });
+        } else {
+            header.set({ stroke: textColor });
+        }
 
-        const TARGET_HEADER_HEIGHT = 100 * SCALE_FACTOR;
+        // Update Text
+        if (header.text !== headerTextValue) {
+            header.set({ text: headerTextValue });
 
-        const scaleX = CONTENT_WIDTH / currentWidth;
-        const scaleY = TARGET_HEADER_HEIGHT / currentHeight;
+            // Recalculate Scale
+            header.set({ scaleX: 1, scaleY: 1 }); // Reset
 
-        header1.set({ scaleX, scaleY });
-        header2.set({ scaleX, scaleY });
-    }
+            const currentWidth = header.width!;
+            const currentHeight = header.height!;
+
+            const scaleX = CONTENT_WIDTH / currentWidth;
+            const scaleY = TARGET_HEADER_HEIGHT / currentHeight;
+
+            header.set({ scaleX, scaleY });
+        }
+    });
 
     // 2. UPDATE FOOTER NAME
     const footerName = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');

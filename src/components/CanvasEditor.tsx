@@ -374,7 +374,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
                     ref={canvasEl}
                     style={{
                         imageRendering: 'auto',
-                        filter: 'drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.15))'
+                        // Floating Effect:
+                        // drop-shadow: Makes the CONTENT (Text/Photos) hover.
+                        filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2))'
                     }}
                 // Note: 'image-rendering: high-quality' is not a standard CSS value in all browsers, 
                 // but 'auto' or default usually uses bilinear/bicubic.

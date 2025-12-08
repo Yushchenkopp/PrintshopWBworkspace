@@ -43,6 +43,9 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
         { x: 652, y: 24, w: 533, h: 472 }
     ];
 
+    const [textVariant, setTextVariant] = useState<'wife' | 'husband'>('wife');
+    const [brightness, setBrightness] = useState<number>(0);
+
     // We only need 2 images for Polaroid, but we keep the list flexible for the sidebar
     // However, the canvas will only display the first 2.
 
@@ -153,6 +156,10 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
             const topLayer: fabric.Object[] = [];    // Text
 
             try {
+                // Ensure font is loaded before rendering to prevent layout shifts
+                await document.fonts.load('44px Caveat');
+                await document.fonts.load('55px Caveat');
+
                 let templateImg = templateRef.current;
                 if (!templateImg) {
                     templateImg = await fabric.Image.fromURL(TEMPLATE_URL, {
@@ -208,12 +215,17 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
                         img.scale(imgScale);
 
+                        // Apply Brightness Filter
+                        if (brightness !== 0) {
+                            img.filters = [new fabric.filters.Brightness({ brightness: brightness })];
+                            img.applyFilters();
+                        }
+
                         // Calculate centered position (Top/Left origin)
                         // We want the center of the image to match the center of the slot.
                         // Image Center = Left + Width/2
                         // Slot Center = SlotX + SlotW/2
                         // Left + Width/2 = SlotX + SlotW/2
-                        // Left = SlotX + SlotW/2 - Width/2
 
 
 
@@ -256,29 +268,90 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                             top: slotY,
                             width: slotW,
                             height: slotH,
-                            fill: '#e4e4e7',
+                            fill: '#e4e4e7', // Reverted to gray
                             selectable: false,
                             hoverCursor: 'pointer'
                         });
 
-                        const text = new fabric.Text('+', {
-                            left: slotX + slotW / 2,
-                            top: slotY + slotH / 2,
-                            originX: 'center',
-                            originY: 'center',
-                            fontSize: 40,
-                            fill: '#a1a1aa',
-                            selectable: false
+                        // Create ImagePlus Icon (Lucide style)
+                        const createIcon = (color: string) => {
+                            const strokeWidth = 2;
+                            // Lucide ImagePlus paths (24x24 grid)
+
+                            // Frame: M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7
+                            const frame = new fabric.Path('M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7', {
+                                fill: '', stroke: color, strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round'
+                            });
+
+                            // Plus H: M16 5h6
+                            const plusH = new fabric.Line([16, 5, 22, 5], {
+                                stroke: color, strokeWidth, strokeLineCap: 'round'
+                            });
+
+                            // Plus V: M19 2v6
+                            const plusV = new fabric.Line([19, 2, 19, 8], {
+                                stroke: color, strokeWidth, strokeLineCap: 'round'
+                            });
+
+                            // Sun: circle cx=9 cy=9 r=2
+                            const sun = new fabric.Circle({
+                                left: 7, top: 7, radius: 2, fill: '', stroke: color, strokeWidth
+                            });
+
+                            // Mountain: m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21
+                            const mountain = new fabric.Path('m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21', {
+                                fill: '', stroke: color, strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round'
+                            });
+
+                            return new fabric.Group([frame, plusH, plusV, sun, mountain], {
+                                originX: 'center', originY: 'center',
+                                left: slotX + slotW / 2,
+                                top: slotY + slotH / 2,
+                                scaleX: 2.5, // Smaller initial scale
+                                scaleY: 2.5,
+                                selectable: false
+                            });
+                        };
+
+                        const iconGroup = createIcon('#9CA3AF'); // Initial color: zinc-400
+
+                        const group = new fabric.Group([placeholder, iconGroup], {
+                            selectable: false,
+                            evented: true,
+                            hoverCursor: 'pointer',
+                            subTargetCheck: true // Allow checking sub-targets if needed, though we handle group hover
                         });
 
-                        const group = new fabric.Group([placeholder, text], {
-                            selectable: false,
-                            evented: true, // Explicitly enable events
-                            hoverCursor: 'pointer'
+                        // Hover Effects
+                        group.on('mouseover', () => {
+                            // Darken icon
+                            iconGroup.forEachObject((obj) => {
+                                obj.set({ stroke: '#374151' }); // zinc-700
+                            });
+
+                            // Smooth Scale Up (1.1x of 2.5 = 2.75)
+                            iconGroup.animate({ scaleX: 2.75, scaleY: 2.75 }, {
+                                duration: 200, // 0.2s
+                                onChange: canvas.requestRenderAll.bind(canvas),
+                                easing: fabric.util.ease.easeOutQuad
+                            });
+                        });
+
+                        group.on('mouseout', () => {
+                            // Restore icon
+                            iconGroup.forEachObject((obj) => {
+                                obj.set({ stroke: '#9CA3AF' }); // zinc-400
+                            });
+
+                            // Smooth Scale Down
+                            iconGroup.animate({ scaleX: 2.5, scaleY: 2.5 }, {
+                                duration: 200, // 0.2s
+                                onChange: canvas.requestRenderAll.bind(canvas),
+                                easing: fabric.util.ease.easeOutQuad
+                            });
                         });
 
                         group.on('mousedown', () => {
-                            // Trigger specific input for this slot
                             document.getElementById(`polaroid-upload-${i}`)?.click();
                         });
                         bottomLayer.push(group);
@@ -287,7 +360,9 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
                 // 2. Prepare Text Fields
                 const textDefaults = [
-                    "Интересно, когда я вырасту,\nкто будет моей женой?",
+                    textVariant === 'wife'
+                        ? "Интересно, когда я вырасту,\nкто будет моей женой?"
+                        : "Интересно, когда я вырасту,\nкто будет моим мужем?",
                     "Я буду!"
                 ];
 
@@ -320,11 +395,11 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         fontSize = 55; // Bigger font
                     }
 
-                    // Use Textbox for auto-wrapping
-                    const text = new fabric.Textbox(textDefaults[i], {
+                    // Use Text to prevent unwanted auto-wrapping (enforces explicit newlines)
+                    const text = new fabric.Text(textDefaults[i], {
                         left: textLeft,
                         top: textTop,
-                        width: slotW - 20, // Wider to fit text in 2 lines
+                        // Removed width to prevent wrapping. Text will strictly follow \n
                         fontFamily: 'Caveat',
                         fontSize: fontSize,
                         fill: '#27272a',
@@ -334,8 +409,6 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         lineHeight: 0.8,
                         selectable: false, // Disable selection/movement
                         evented: false, // Disable events
-                        editable: false,
-                        splitByGrapheme: false,
                         hasControls: false,
                         lockRotation: true,
                         lockScalingX: true,
@@ -343,12 +416,6 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         lockMovementX: true,
                         lockMovementY: true,
                     });
-
-                    // Constraints (simplified for static text, but kept for consistency)
-                    const paperBottom = slotY + slotH + 220;
-                    const paperLeft = slotX;
-                    const paperRight = slotX + slotW;
-                    const minTop = slotY + slotH;
 
                     // Constraints removed for static text to prevent accidental shifts
                     // The initial position is calculated correctly above.
@@ -392,7 +459,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
         renderPolaroid();
 
-    }, [canvas, images, slots]); // Removed isCalibration from deps
+    }, [canvas, images, slots, textVariant, brightness]); // Added brightness to deps
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -421,6 +488,31 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         ))}
                     </div>
                 </div>
+
+                <section>
+                    <div className="flex justify-between items-center mb-3">
+                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ТЕКСТ</h2>
+                    </div>
+                    <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px]">
+                        {/* Sliding Indicator */}
+                        <div
+                            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-[6px] shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${textVariant === 'wife' ? 'left-1' : 'left-[calc(50%)]'}`}
+                        />
+
+                        <button
+                            onClick={() => setTextVariant('wife')}
+                            className={`flex-1 relative z-10 text-[13px] font-medium transition-colors duration-200 ${textVariant === 'wife' ? 'text-black' : 'text-[#8E8E93]'}`}
+                        >
+                            Жена
+                        </button>
+                        <button
+                            onClick={() => setTextVariant('husband')}
+                            className={`flex-1 relative z-10 text-[13px] font-medium transition-colors duration-200 ${textVariant === 'husband' ? 'text-black' : 'text-[#8E8E93]'}`}
+                        >
+                            Муж
+                        </button>
+                    </div>
+                </section>
 
                 <section>
                     <div className="flex justify-between items-center mb-3">
@@ -480,6 +572,24 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         multiple
                         accept="image/*"
                         onChange={(e) => handleImageUpload(e, 1)}
+                    />
+                </section>
+
+                <section>
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-1">
+                            Яркость
+                        </span>
+                        <span className="text-[10px] font-medium text-zinc-400">{(brightness * 100).toFixed(0)}%</span>
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="0.2"
+                        step="0.01"
+                        value={brightness}
+                        onChange={(e) => setBrightness(parseFloat(e.target.value))}
+                        className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                     />
                 </section>
             </aside>

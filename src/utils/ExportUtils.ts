@@ -83,6 +83,65 @@ const crc32 = (buf: Uint8Array): number => {
 };
 
 
+// Helper to load DataURL to Canvas
+const loadDataURLToCanvas = (dataURL: string): Promise<HTMLCanvasElement> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.width;
+            c.height = img.height;
+            c.getContext('2d')?.drawImage(img, 0, 0);
+            resolve(c);
+        };
+        img.onerror = reject;
+        img.src = dataURL;
+    });
+};
+
+// Helper to trim transparent pixels
+const trimTransparency = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let found = false;
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const alpha = data[(y * w + x) * 4 + 3];
+            if (alpha > 0) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                found = true;
+            }
+        }
+    }
+
+    if (!found) return canvas; // Empty
+
+    const trimWidth = maxX - minX + 1;
+    const trimHeight = maxY - minY + 1;
+
+    // Safety: don't crop if already tight or error
+    if (trimWidth <= 0 || trimHeight <= 0) return canvas;
+
+    const trimmed = document.createElement('canvas');
+    trimmed.width = trimWidth;
+    trimmed.height = trimHeight;
+    const tCtx = trimmed.getContext('2d');
+    tCtx?.drawImage(canvas, minX, minY, trimWidth, trimHeight, 0, 0, trimWidth, trimHeight);
+
+    return trimmed;
+};
+
 export const exportHighRes = async (canvas: fabric.Canvas) => {
     if (!canvas) return;
 
@@ -93,9 +152,8 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
         // 2. Reset Viewport to Identity
         canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
         canvas.discardActiveObject();
-        // canvas.requestRenderAll(); // Removed to prevent flicker
 
-        // 3. Calculate Bounding Box
+        // 3. Calculate Bounding Box (Loose)
         let minX = Infinity;
         let minY = Infinity;
         let maxX = -Infinity;
@@ -134,8 +192,8 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
             if (bound.top + bound.height > maxY) maxY = bound.top + bound.height;
         });
 
-        // 4. Add Padding
-        const padding = 2;
+        // 4. Add Zero Padding (Logic moved to trim)
+        const padding = 0;
         minX = Math.floor(minX - padding);
         minY = Math.floor(minY - padding);
         maxX = Math.ceil(maxX + padding);
@@ -148,7 +206,7 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
         const targetWidthPx = Math.round((31 / 2.54) * 200);
         const multiplier = targetWidthPx / cropWidth;
 
-        // 6. Export to Blob
+        // 6. Export to Base64 (Loose Crop)
         const dataURL = canvas.toDataURL({
             format: 'png',
             quality: 1,
@@ -159,23 +217,28 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
             height: cropHeight
         });
 
-        // Restore Viewport IMMEDIATELY (before async yield)
+        // Restore Viewport IMMEDIATELY
         if (originalViewport) {
             canvas.setViewportTransform(originalViewport);
         }
 
-        // Convert Base64 to Blob
-        const response = await fetch(dataURL);
-        let blob = await response.blob();
+        // 7. Process Pixel-Perfect Trim
+        const fullCanvas = await loadDataURLToCanvas(dataURL);
+        const trimmedCanvas = trimTransparency(fullCanvas);
 
-        // 7. Inject DPI Metadata
+        // 8. Convert to Blob
+        let blob = await new Promise<Blob | null>(resolve => trimmedCanvas.toBlob(resolve, 'image/png'));
+
+        if (!blob) throw new Error("Blob creation failed");
+
+        // 9. Inject DPI Metadata
         blob = await setDpi(blob, 200);
 
-        // 9. Download
+        // 10. Download
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        link.download = `collage-31cm-200dpi-${timestamp}.png`;
+        link.download = `layout-31cm-200dpi-${timestamp}.png`;
         link.href = url;
         document.body.appendChild(link);
         link.click();
@@ -185,12 +248,6 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
     } catch (error) {
         console.error("Export failed:", error);
         alert("Не удалось сохранить файл. Попробуйте еще раз.");
-        // Try to restore viewport
-        try {
-            if (canvas && canvas.viewportTransform) {
-                // canvas.setViewportTransform(originalViewport); // Can't access originalViewport easily in catch
-            }
-        } catch (e) { }
     }
 };
 

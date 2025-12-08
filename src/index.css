@@ -1,7 +1,23 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Varsity Regular';
+  src: url('/fonts/varsityregular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JackportCollegeNcv';
+  src: url('/fonts/JackportCollegeNcv1MZe.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
-    button {
-        cursor: pointer;
-    }
+  button {
+    cursor: pointer;
+  }
 }
