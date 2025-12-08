@@ -204,7 +204,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
             {/* SIDEBAR */}
-            <aside className="fixed left-6 top-6 w-[400px] h-auto max-h-[calc(100vh-48px)] bg-white/60 backdrop-blur-2xl rounded-3xl border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.05)] p-6 flex flex-col gap-6 overflow-y-auto z-[100] scrollbar-hide">
+            <aside className="sidebar-panel">
                 <div className="flex justify-center">
                     <img src="/logo.png" alt="Logo" className="w-40 opacity-80 drop-shadow-xl object-contain" />
                 </div>

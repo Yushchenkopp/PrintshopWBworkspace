@@ -42,6 +42,19 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const [aspectRatio, setAspectRatio] = useState<number>(1);
     const [logicalCanvasHeight, setLogicalCanvasHeight] = useState<number>(800);
     const [headerLines, setHeaderLines] = useState<number>(2);
+    const [signatureText, setSignatureText] = useState<string>('WANNA BE YOURS');
+    const [isSignatureEnabled, setIsSignatureEnabled] = useState<boolean>(false);
+    const [isBorderEnabled, setIsBorderEnabled] = useState<boolean>(false); // Canvas State (Delayed)
+    const [visualBorderEnabled, setVisualBorderEnabled] = useState<boolean>(false); // UI State (Instant)
+
+    // Debounce signature text
+    const [debouncedSignatureText, setDebouncedSignatureText] = useState<string>('WANNA BE YOURS');
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSignatureText(signatureText);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [signatureText]);
 
     const [originalValues, setOriginalValues] = useState<{
         header: string; name: string; date: string;
@@ -139,7 +152,10 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
         aspectRatio: 1,
         isBWEnabled: true,
         brightness: 0,
-        headerLines: 2
+        headerLines: 2,
+        signatureText: 'WANNA BE YOURS',
+        isSignatureEnabled: false,
+        isBorderEnabled: false
     });
 
     const lastDateRef = useRef('05.09.2025');
@@ -153,7 +169,9 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     const isStructureChanged =
                         currentImagesJson !== prevPropsRef.current.imagesJson ||
                         aspectRatio !== prevPropsRef.current.aspectRatio ||
-                        headerLines !== prevPropsRef.current.headerLines;
+                        headerLines !== prevPropsRef.current.headerLines ||
+                        isSignatureEnabled !== prevPropsRef.current.isSignatureEnabled ||
+                        isBorderEnabled !== prevPropsRef.current.isBorderEnabled;
 
                     const isFilterChanged =
                         isBWEnabled !== prevPropsRef.current.isBWEnabled ||
@@ -162,7 +180,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     if (isStructureChanged || images.length === 0) { // Force render if empty to show placeholder
                         // Full Re-render
                         const imageUrls = images.map(img => img.url);
-                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines);
+                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled);
                         setLogicalCanvasHeight(newHeight);
 
                         // Reveal canvas after first render and layout adjustment
@@ -174,7 +192,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         updateCollageFilters(canvas, isBWEnabled, brightness);
                     } else {
                         // Smart Update (Text Only)
-                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines);
+                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled);
                     }
 
                     // Update refs
@@ -183,7 +201,10 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         aspectRatio,
                         isBWEnabled,
                         brightness,
-                        headerLines
+                        headerLines,
+                        signatureText,
+                        isSignatureEnabled,
+                        isBorderEnabled
                     };
                 } catch (error) {
                     console.error("Error rendering template:", error);
@@ -191,11 +212,11 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines]);
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled]);
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
-            <aside className="fixed left-6 top-6 w-[400px] h-auto max-h-[calc(100vh-48px)] bg-white/60 backdrop-blur-2xl rounded-3xl border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.05)] p-6 flex flex-col gap-6 overflow-y-auto z-[100] scrollbar-hide">
+            <aside className="sidebar-panel">
 
                 <div className="flex justify-center">
                     <img
@@ -234,7 +255,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         </label>
                     </div>
                     {images.length === 0 ? (
-                        <label className="border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
+                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
                             <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageUpload} />
                             <ImagePlus className="w-8 h-8 text-zinc-300 mb-2 group-hover:text-zinc-400 transition-colors" />
                             <span className="text-sm font-medium text-zinc-600">Загрузить фото</span>
@@ -271,7 +292,6 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                 </section>
 
                 <section>
-                    <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-3">ФОРМАТ</h2>
                     <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-4">
                         {/* Sliding Indicator */}
                         <div
@@ -295,51 +315,29 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         ))}
                     </div>
 
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ТЕКСТ И СТИЛЬ</h2>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">SINCE</span>
-                                <button
-                                    onClick={() => {
-                                        const newValue = !isSinceEnabled;
-                                        setIsSinceEnabled(newValue);
-                                        if (!newValue) {
-                                            if (footerDate) lastDateRef.current = footerDate;
-                                            setFooterDate('');
-                                        } else {
-                                            setFooterDate(lastDateRef.current || '05.09.2025');
-                                        }
-                                    }}
-                                    className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isSinceEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                                >
-                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isSinceEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                                </button>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">ТРАНСЛИТ</span>
-                                <button
-                                    onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
-                                    className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                                >
-                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                                </button>
-                            </div>
+                    {/* Header Row: Input + Lines Control */}
+                    <div className="flex gap-2 mb-3">
+                        {/* Header Input */}
+                        <div className="relative group flex-1">
+                            <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
+                            <input
+                                type="text"
+                                maxLength={14}
+                                value={headerText}
+                                onChange={(e) => handleTextChange(setHeaderText, e.target.value)}
+                                className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
+                                placeholder="GIRLFRIEND"
+                            />
                         </div>
-                    </div>
 
-
-                    <div className="mb-4">
-                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">ЗАГОЛОВОК</h2>
-                        <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px]">
-                            {/* Sliding Indicator */}
+                        {/* Lines Control */}
+                        <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[40px] w-[110px] shrink-0">
                             <div
                                 className="absolute top-1 bottom-1 w-[calc(33.33%-4px)] bg-white rounded-[6px] shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
                                 style={{
                                     left: headerLines === 1 ? '4px' : headerLines === 2 ? 'calc(33.33% + 2px)' : 'calc(66.66% + 0px)'
                                 }}
                             />
-
                             {[1, 2, 3].map((val) => (
                                 <button
                                     key={val}
@@ -352,77 +350,150 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        {/* Header Input */}
-                        <div className="relative group">
-                            <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
+                    {/* Name & Date Row */}
+                    <div className="flex gap-2">
+                        <div className="relative group flex-1">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                             <input
                                 type="text"
-                                maxLength={14}
-                                value={headerText}
-                                onChange={(e) => handleTextChange(setHeaderText, e.target.value)}
+                                value={footerName}
+                                onChange={(e) => handleTextChange(setFooterName, e.target.value)}
                                 className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
-                                placeholder="GIRLFRIEND"
+                                placeholder="VALERIA"
                             />
                         </div>
+                        <div className="relative group flex-1">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
+                            <input
+                                type="text"
+                                value={footerDate}
+                                onChange={(e) => handleTextChange(setFooterDate, e.target.value)}
+                                className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
+                                placeholder="05.09.2025"
+                            />
+                        </div>
+                    </div>
 
-                        {/* Name & Date Row */}
-                        <div className="flex gap-2">
-                            <div className="relative group flex-1">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={footerName}
-                                    onChange={(e) => handleTextChange(setFooterName, e.target.value)}
-                                    className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
-                                    placeholder="VALERIA"
+                    {/* Signature Ghost Button / Field */}
+                    <div className="mt-1 mb-3">
+                        {!isSignatureEnabled ? (
+                            <button
+                                onClick={() => setIsSignatureEnabled(true)}
+                                className="text-[11px] text-zinc-400 hover:text-zinc-600 font-medium px-1 py-0.5 transition-colors cursor-pointer"
+                            >
+                                + подпись
+                            </button>
+                        ) : (
+                            <div className="relative mt-2">
+                                <textarea
+                                    value={signatureText}
+                                    onChange={(e) => handleTextChange(setSignatureText, e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 resize-none"
+                                    placeholder="WANNA BE YOURS"
+                                    rows={3}
+                                    style={{ minHeight: '60px' }}
                                 />
+                                {/* Optional: Click to remove/hide if empty? Staying simpler for now. */}
                             </div>
-                            <div className="relative group flex-1">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={footerDate}
-                                    onChange={(e) => handleTextChange(setFooterDate, e.target.value)}
-                                    className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
-                                    placeholder="05.09.2025"
-                                />
-                            </div>
+                        )}
+                    </div>
+
+                    {/* Settings Row: Since + Translit */}
+                    <div className="flex items-center gap-4 mb-3 px-1">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">SINCE</span>
+                            <button
+                                onClick={() => {
+                                    const newValue = !isSinceEnabled;
+                                    setIsSinceEnabled(newValue);
+                                    if (!newValue) {
+                                        if (footerDate) lastDateRef.current = footerDate;
+                                        setFooterDate('');
+                                    } else {
+                                        setFooterDate(lastDateRef.current || '05.09.2025');
+                                    }
+                                }}
+                                className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isSinceEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                            >
+                                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isSinceEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">ТРАНСЛИТ</span>
+                            <button
+                                onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
+                                className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                            >
+                                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                            </button>
                         </div>
                     </div>
 
                     <div className="mt-6 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ЦВЕТ</span>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setTextColor('#000000')}
-                                    className={`w-6 h-6 rounded-full border border-zinc-300 bg-black cursor-pointer transition-all ${textColor === '#000000' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
-                                />
-                                <button
-                                    onClick={() => setTextColor('#FFFFFF')}
-                                    className={`w-6 h-6 rounded-full border border-zinc-300 bg-white cursor-pointer transition-all ${textColor === '#FFFFFF' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
-                                />
+                            <div className="flex items-center">
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setTextColor('#000000');
+                                            // Auto-disable border when switching to black text (since border is black only)
+                                            setIsBorderEnabled(false);
+                                            setVisualBorderEnabled(false);
+                                        }}
+                                        className={`w-6 h-6 rounded-full border border-zinc-300 bg-black cursor-pointer transition-all ${textColor === '#000000' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
+                                    />
+                                    <button
+                                        onClick={() => setTextColor('#FFFFFF')}
+                                        className={`w-6 h-6 rounded-full border border-zinc-300 bg-white cursor-pointer transition-all ${textColor === '#FFFFFF' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
+                                    />
+                                </div>
+
+                                {/* Border Text Chip (Clearer UX) */}
+                                {images.length > 0 && textColor === '#FFFFFF' && (
+                                    <button
+                                        onClick={() => {
+                                            const newValue = !visualBorderEnabled;
+                                            setVisualBorderEnabled(newValue);
+
+                                            // Deferred Canvas Update
+                                            setTimeout(() => {
+                                                setIsBorderEnabled(newValue);
+                                            }, 350);
+                                        }}
+                                        className={`ml-3 px-3 py-1 rounded-full text-[11px] font-medium transition-all border ${visualBorderEnabled
+                                            ? 'bg-black text-white border-black'
+                                            : 'bg-zinc-100 text-zinc-500 border-zinc-200 hover:bg-zinc-200'
+                                            }`}
+                                    >
+                                        обводка
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Ч/Б</span>
-                            <button
-                                onClick={() => setIsBWEnabled(!isBWEnabled)}
-                                className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isBWEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                            >
-                                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isBWEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                            </button>
-                        </div>
+
                     </div>
 
                     <div className="mt-6">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-1">
-                                <Sun className="w-3 h-3" /> Яркость
-                            </span>
-                            <span className="text-[10px] font-medium text-zinc-400">{(brightness * 100).toFixed(0)}%</span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-1">
+                                    <Sun className="w-3 h-3" /> Яркость
+                                </span>
+                                <span className="text-[10px] font-medium text-zinc-400">{(brightness * 100).toFixed(0)}%</span>
+                            </div>
+
+                            {/* B/W Toggle (Moved here) */}
+                            <div className="flex items-center gap-2 scale-90 origin-right">
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Ч/Б</span>
+                                <button
+                                    onClick={() => setIsBWEnabled(!isBWEnabled)}
+                                    className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isBWEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isBWEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                                </button>
+                            </div>
                         </div>
                         <input
                             type="range"

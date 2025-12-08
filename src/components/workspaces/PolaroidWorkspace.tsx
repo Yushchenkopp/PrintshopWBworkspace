@@ -463,7 +463,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
-            <aside className="fixed left-6 top-6 w-[400px] h-auto max-h-[calc(100vh-48px)] bg-white/60 backdrop-blur-2xl rounded-3xl border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.05)] p-6 flex flex-col gap-6 overflow-y-auto z-[100] scrollbar-hide">
+            <aside className="sidebar-panel">
                 <div className="flex justify-center">
                     <img src="/logo.png" alt="Logo" className="w-40 opacity-80 drop-shadow-xl object-contain" />
                 </div>
@@ -525,7 +525,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         </label>
                     </div>
                     {images.every(img => img === null) ? (
-                        <label className="border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
+                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
                             <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => {
                                 handleImageUpload(e);
                             }} />

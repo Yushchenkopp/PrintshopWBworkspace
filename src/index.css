@@ -21,3 +21,44 @@
     cursor: pointer;
   }
 }
+
+/* Global Sidebar Responsiveness */
+/* Global Sidebar Responsiveness */
+.sidebar-panel {
+  @apply fixed left-6 top-6 flex flex-col gap-6 overflow-y-auto z-[100] p-6 rounded-3xl border backdrop-blur-2xl;
+
+  /* Arbitrary values that fail in @apply */
+  width: 400px;
+  max-height: calc(100vh - 48px);
+  background-color: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+
+  /* Hide Scrollbar */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.sidebar-panel::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-height: 900px) {
+  .sidebar-panel {
+    gap: 12px !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+
+  .upload-photo-block {
+    height: 80px !important;
+  }
+}
+
+@media (max-height: 750px) {
+  .sidebar-panel {
+    zoom: 0.9;
+  }
+}

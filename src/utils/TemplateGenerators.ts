@@ -87,6 +87,7 @@ const createBarcode = (width: number, height: number, color: string = '#000000')
 
 // Функция теперь возвращает Promise<number> (Высоту макета)
 // Функция теперь возвращает Promise<number> (Высоту макета)
+// Функция теперь возвращает Promise<number> (Высоту макета)
 export const generateCollageTemplate = async (
     canvas: any,
     images: any[],
@@ -98,7 +99,10 @@ export const generateCollageTemplate = async (
     isSince: boolean = true,
     textColor: string = '#000000',
     brightness: number = 0,
-    headerLines: number = 2
+    headerLines: number = 2,
+    signatureTextValue: string = 'WANNA BE YOURS', // New
+    isSignatureEnabled: boolean = false, // New
+    isBorderEnabled: boolean = false // New Border logic
 ): Promise<number> => {
     if (!canvas) return 800;
 
@@ -230,28 +234,56 @@ export const generateCollageTemplate = async (
     // --- GRID CALCULATION ---
     const gridTop = currentTop;
 
-    // 3. Calculate Grid Height
-    // If a column has `maxPhotosInCol` photos, each photo should have height = colWidth / aspectRatio.
+    // Border Configuration (Padding Buffer)
+    // User wants 2px printed border -> 2 units.
+    const BORDER_WIDTH = (isBorderEnabled && textColor === '#FFFFFF') ? 2 : 0;
+
+    // Effective Width for Photos (Box-Sizing: Border-Box simulation)
+    const INNER_CONTENT_WIDTH = CONTENT_WIDTH - (BORDER_WIDTH * 2);
 
     // 2. Calculate column width
     const numCols = colLayout.length;
-    const colWidth = numCols > 0 ? CONTENT_WIDTH / numCols : 0; // Avoid division by zero
+    const colWidth = numCols > 0 ? INNER_CONTENT_WIDTH / numCols : 0;
 
-    let gridHeight = 0;
+    let innerGridHeight = 0;
     if (count === 0) {
-        gridHeight = CONTENT_WIDTH; // Default Square Placeholder Height
+        innerGridHeight = CONTENT_WIDTH; // Default
     } else {
-        // 1. Find max photos in a column
         const maxPhotosInCol = colLayout.length > 0 ? Math.max(...colLayout) : 0;
-        gridHeight = maxPhotosInCol * (colWidth / aspectRatio);
+        innerGridHeight = maxPhotosInCol * (colWidth / aspectRatio);
+    }
+
+    // --- RENDER BACKGROUND (Gap Insurance) ---
+    // Strategy: "Triple Protection"
+    // 1. Black Background fills any subpixel gaps between photos and border.
+    // CONDITION: Border enabled AND Text is White (Border not allowed on Black text)
+    const isBorderActive = isBorderEnabled && textColor === '#FFFFFF';
+
+    if (isBorderActive && innerGridHeight > 0) {
+        // Total Grid Height includes the border padding
+        const totalBgHeight = innerGridHeight + (BORDER_WIDTH * 2);
+
+        const bgRect = new fabric.Rect({
+            left: PADDING_SIDE,
+            top: gridTop,
+            width: CONTENT_WIDTH,
+            height: totalBgHeight,
+            fill: '#000000', // Black "Seam Filler"
+            selectable: false,
+            evented: false,
+            name: 'collage-bg-fill'
+        });
+        canvas.add(bgRect);
     }
 
     // --- RENDER IMAGES ---
     let imageIndex = 0;
     for (let col = 0; col < numCols; col++) {
         const photosInCol = colLayout[col];
-        const photoHeight = gridHeight / photosInCol;
-        const colLeft = PADDING_SIDE + (col * colWidth);
+        const photoHeight = innerGridHeight / photosInCol;
+
+        // Start from Padding + Border
+        const colLeft = PADDING_SIDE + BORDER_WIDTH + (col * colWidth);
 
         for (let row = 0; row < photosInCol; row++) {
             if (imageIndex >= loadedImages.length) break;
@@ -267,14 +299,25 @@ export const generateCollageTemplate = async (
                 img.applyFilters();
 
                 const left = colLeft + (colWidth / 2);
-                const top = gridTop + (row * photoHeight) + (photoHeight / 2);
+                const top = gridTop + BORDER_WIDTH + (row * photoHeight) + (photoHeight / 2);
 
-                // FIX: Add small overlap to prevent 1px gaps
-                const OVERLAP = 2;
+                // DUAL LOGIC: Strip Gaps vs Strict Border
+                // 1. Border Active: STRICT Mode. overflow: hidden logic. No overlap. 
+                //    We rely on the Black Background to fill gaps if any (but strict math should suffice).
+                // 2. Border Inactive: BLEED Mode. 
+                //    We need overlap to cover subpixel white lines between photos.
+
+                const OVERLAP = isBorderActive ? 0 : 2;
 
                 const scaleX = (colWidth + OVERLAP) / img.width!;
                 const scaleY = (photoHeight + OVERLAP) / img.height!;
                 const scale = Math.max(scaleX, scaleY);
+
+                // ClipPath Logic
+                // If Border Active: Clip Strict to visible cell (colWidth).
+                // If Border Inactive: Clip Loosely (colWidth + OVERLAP) to allow bleed.
+                const clipW = colWidth + OVERLAP;
+                const clipH = photoHeight + OVERLAP;
 
                 img.set({
                     left: left,
@@ -286,8 +329,8 @@ export const generateCollageTemplate = async (
                     clipPath: new fabric.Rect({
                         left: left,
                         top: top,
-                        width: colWidth + OVERLAP,
-                        height: photoHeight + OVERLAP,
+                        width: clipW,
+                        height: clipH,
                         originX: 'center',
                         originY: 'center',
                         absolutePositioned: true
@@ -297,7 +340,7 @@ export const generateCollageTemplate = async (
                     borderColor: '#000',
                     transparentCorners: false,
                     perPixelTargetFind: true,
-                    selectable: true // Ensure images are selectable
+                    selectable: true
                 });
 
                 img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
@@ -309,7 +352,8 @@ export const generateCollageTemplate = async (
 
     // --- FOOTER ---
     const footerMarginTop = 15 * SCALE_FACTOR;
-    const footerTop = gridTop + gridHeight + footerMarginTop;
+    // Total Grid Height = Inner + 2*Border
+    const footerTop = gridTop + innerGridHeight + (BORDER_WIDTH * 2) + footerMarginTop;
 
     // Barcode
     const barcodeWidth = CONTENT_WIDTH * 0.35;
@@ -330,6 +374,13 @@ export const generateCollageTemplate = async (
         left: FULL_WIDTH - PADDING_SIDE,
         top: footerTop
     });
+    // If name is empty string, we hide it (visual only, object could still exist but with empty text)
+    if (!footerTextValue) {
+        nameText.visible = false;
+        // Reset dimensions for calculation purposes
+        nameText.height = 0;
+    }
+
     const maxNameWidth = CONTENT_WIDTH * 0.55;
     if (nameText.width! > maxNameWidth) {
         const scale = maxNameWidth / nameText.width!;
@@ -337,7 +388,50 @@ export const generateCollageTemplate = async (
     }
     canvas.add(nameText);
 
+    // Signature Logic
+    if (isSignatureEnabled) {
+        const signatureFontSize = 28 * SCALE_FACTOR;
+        const signatureWidth = CONTENT_WIDTH * 0.5;
+
+        // Position: 
+        // If Name is visible: beneath Name
+        // If Name is hidden: at Name's position + OFFSET
+        let signatureTop = footerTop;
+        if (footerTextValue) {
+            const nameHeight = nameText.height! * nameText.scaleY!;
+            signatureTop += nameHeight + (5 * SCALE_FACTOR); // Small gap
+        } else {
+            signatureTop += (10 * SCALE_FACTOR); // "A bit higher" (10px) when name is empty
+        }
+
+        const signature = new fabric.Textbox(signatureTextValue, {
+            width: signatureWidth,
+            fontFamily: 'Arial',
+            fontWeight: 'bold',
+            fontSize: signatureFontSize,
+            fill: textColor,
+            textAlign: 'right',
+            originX: 'right',
+            originY: 'top',
+            left: FULL_WIDTH - PADDING_SIDE,
+            top: signatureTop,
+            splitByGrapheme: false, // Word wrap
+            selectable: false,
+            evented: false,
+            name: 'footer-signature'
+        });
+
+        canvas.add(signature);
+    }
+
     // Date
+    // Date should be aligned with Barcode, but we need to ensure it doesn't overlap signature if signature is very long?
+    // User req: Signature is right-aligned. Date is left-aligned (under barcode usually?)
+    // Actually current code: Date is under barcode.
+    // Barcode is Left. Name is Right.
+    // So Signature (Right) shouldn't conflict with Date (Left) unless very long.
+    // We kept Max Width 50% for signature, so it should be fine.
+
     const dateString = isSince ? `since ${footerDateValue}` : footerDateValue;
     const dateText = createText(dateString, 24 * SCALE_FACTOR, 'bold');
     const dateTop = footerTop + barcodeOffsetY + barcodeHeight + (5 * SCALE_FACTOR);
@@ -357,10 +451,59 @@ export const generateCollageTemplate = async (
     canvas.add(dateText);
 
     // Final Render
-    // Use a fixed height for the date area to prevent layout jumps when toggling 'since'
-    // The date text scales, but we reserve a constant space for it.
-    const FIXED_DATE_HEIGHT = 30 * SCALE_FACTOR;
-    const totalHeight = dateTop + FIXED_DATE_HEIGHT + (40 * SCALE_FACTOR);
+    // Calculate total height to include dynamic elements
+    let totalHeight = dateTop + (30 * SCALE_FACTOR) + (40 * SCALE_FACTOR);
+
+    // Check if signature extends lower
+    if (isSignatureEnabled) {
+        const sig = canvas.getObjects().find((o: any) => o.name === 'footer-signature');
+        if (sig) {
+            const sigBottom = sig.top! + sig.height! + (40 * SCALE_FACTOR);
+            if (sigBottom > totalHeight) totalHeight = sigBottom;
+        }
+    }
+
+    // Border Logic: Hybrid "Padding + Stroke"
+    // Geometry: Photos are already shifted by Padding (BORDER_WIDTH = 2).
+    // Rendering: We draw a crisp 2px Stroke in that empty space.
+    // CONDITION: Border enabled AND Text is White
+    if (isBorderEnabled && count > 0 && textColor === '#FFFFFF') {
+        const borderStrokeWidth = 2; // Exact 2px
+        const halfStroke = borderStrokeWidth / 2;
+
+        // Total Grid area (Inner + Borders)
+        const totalGridHeight = innerGridHeight + (BORDER_WIDTH * 2);
+
+        // Outer Bounds (Exact integers)
+        const boundsLeft = Math.round(PADDING_SIDE);
+        const boundsTop = Math.round(gridTop);
+        const boundsWidth = Math.round(CONTENT_WIDTH);
+        const boundsHeight = Math.round(totalGridHeight);
+
+        // Inset Stroke Props (`box-shadow: inset 0 0 0 2px`)
+        // Path Center = Edge + 1px.
+        // Size = Outer - 2px.
+        const borderLeft = boundsLeft + halfStroke;
+        const borderTop = boundsTop + halfStroke;
+        const borderWidth = boundsWidth - borderStrokeWidth;
+        const borderHeight = boundsHeight - borderStrokeWidth;
+
+        const border = new fabric.Rect({
+            left: borderLeft,
+            top: borderTop,
+            width: borderWidth,
+            height: borderHeight,
+            fill: 'transparent', // No fill (paper background shows? actually photos cover inner, this covers gap)
+            stroke: '#000000',   // Crisp Stroke
+            strokeWidth: borderStrokeWidth,
+            selectable: false,
+            evented: false,
+            objectCaching: false,
+            strokeUniform: true,
+            name: 'collage-border'
+        });
+        canvas.add(border);
+    }
 
     canvas.requestRenderAll();
     return totalHeight;
@@ -374,7 +517,9 @@ export const updateCollageHeader = (
     footerDateValue: string,
     isSince: boolean,
     textColor: string,
-    headerLines: number // New param for compatibility
+    headerLines: number, // New param for compatibility
+    signatureTextValue: string, // New
+    isSignatureEnabled: boolean // New
 ) => {
     if (!canvas) return;
 
@@ -426,21 +571,64 @@ export const updateCollageHeader = (
 
     // 2. UPDATE FOOTER NAME
     const footerName = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
+    let nameHeight = 0;
+
     if (footerName) {
-        footerName.set({ text: footerTextValue, fill: textColor });
+        footerName.set({ fill: textColor });
 
-        // Reset scale to 1 before checking width
-        footerName.set({ scaleX: 1, scaleY: 1 });
+        // Visibility Logic
+        if (!footerTextValue) {
+            footerName.set({ text: '', visible: false, height: 0 }); // Hide
+            nameHeight = 0;
+        } else {
+            // If previously hidden, we might need to reset visibility
+            footerName.set({ visible: true });
 
-        // Auto-scale Name (max 55% width)
-        const maxNameWidth = CONTENT_WIDTH * 0.55;
-        if (footerName.width! > maxNameWidth) {
-            const scale = maxNameWidth / footerName.width!;
-            footerName.set({ scaleX: scale, scaleY: scale });
+            if (footerName.text !== footerTextValue) { // Only update if changed
+                footerName.set({ text: footerTextValue });
+
+                // Reset scale to 1 before checking width
+                footerName.set({ scaleX: 1, scaleY: 1 });
+
+                // Auto-scale Name (max 55% width)
+                const maxNameWidth = CONTENT_WIDTH * 0.55;
+                if (footerName.width! > maxNameWidth) {
+                    const scale = maxNameWidth / footerName.width!;
+                    footerName.set({ scaleX: scale, scaleY: scale });
+                }
+            }
+            nameHeight = footerName.height! * footerName.scaleY!;
         }
     }
 
-    // 3. UPDATE FOOTER DATE
+    // 3. UPDATE SIGNATURE
+    // Since signature structure might change (add/remove), we need to handle this.
+    // If we receive "enabled" and no object exists -> we should probably re-render full template or create it here.
+    // For simplicity, if signature state toggles, the Workspace should trigger FULL re-render (generateCollageTemplate).
+    // This function assumes objects exist or we just update text/color.
+
+    const signature = canvas.getObjects().find((obj: any) => obj.name === 'footer-signature');
+
+    if (isSignatureEnabled && signature) {
+        signature.set({ text: signatureTextValue, fill: textColor, visible: true });
+
+        // Update Position based on Name
+        const footerTop = footerName ? footerName.top : 0; // Fallback
+
+        let signatureTop = footerTop;
+        if (footerTextValue && footerName && footerName.visible) {
+            signatureTop += nameHeight + (5 * SCALE_FACTOR);
+        } else {
+            signatureTop += (10 * SCALE_FACTOR); // "A bit higher" (10px) when name is empty
+        }
+        signature.set({ top: signatureTop });
+
+    } else if (!isSignatureEnabled && signature) {
+        signature.set({ visible: false });
+    }
+
+
+    // 4. UPDATE FOOTER DATE
     const footerDate = canvas.getObjects().find((obj: any) => obj.name === 'footer-date');
     if (footerDate) {
         const dateString = isSince ? `since ${footerDateValue}` : footerDateValue;
@@ -456,7 +644,7 @@ export const updateCollageHeader = (
         }
     }
 
-    // 4. UPDATE BARCODE COLOR
+    // 5. UPDATE BARCODE COLOR
     const barcodeGroup = canvas.getObjects().find((obj: any) => obj.name === 'footer-barcode');
     if (barcodeGroup && barcodeGroup.type === 'group') {
         (barcodeGroup as fabric.Group).getObjects().forEach((obj: any) => {
