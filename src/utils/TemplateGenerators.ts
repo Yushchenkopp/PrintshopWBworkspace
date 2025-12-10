@@ -323,10 +323,17 @@ export const generateCollageTemplate = async (
                     borderColor: '#000',
                     transparentCorners: false,
                     perPixelTargetFind: true,
-                    selectable: true
+                    selectable: true,
+                    hasControls: true, // EXPLICIT FORCE
+                    cornerSize: 10 * SCALE_FACTOR, // EXPLICIT FORCE (30px)
+                    touchCornerSize: 10 * SCALE_FACTOR
                 });
 
-                img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                img.setControlsVisibility({
+                    mt: false, mb: false, ml: false, mr: false,
+                    tl: true, tr: true, bl: true, br: true, // EXPLICITLY ENABLE CORNERS
+                    mtr: false
+                });
                 canvas.add(img);
             }
             imageIndex++;

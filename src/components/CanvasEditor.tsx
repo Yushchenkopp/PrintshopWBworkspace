@@ -60,6 +60,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
         fabric.Object.prototype.cornerStrokeColor = '#000000';
         fabric.Object.prototype.borderColor = '#000000';
         fabric.Object.prototype.cornerSize = 10 * SCALE_FACTOR;
+        fabric.Object.prototype.touchCornerSize = 10 * SCALE_FACTOR;
         fabric.Object.prototype.borderScaleFactor = 2 * SCALE_FACTOR;
 
         canvasInstance.current = canvas;

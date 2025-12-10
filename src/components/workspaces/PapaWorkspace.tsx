@@ -262,6 +262,12 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                             borderScaleFactor: 12
                         });
 
+                        img.setControlsVisibility({
+                            tl: true, tr: true, bl: true, br: true,
+                            mt: false, mb: false, ml: false, mr: false,
+                            mtr: false
+                        });
+
                         const objectsToResolve: fabric.Object[] = [img];
 
                         if (isBorderEnabled) {
