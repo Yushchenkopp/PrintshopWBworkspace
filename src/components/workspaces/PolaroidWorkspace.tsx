@@ -441,12 +441,27 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 canvas.requestRenderAll();
                 // Explicit Deselection Handler for Polaroid
                 // (CanvasEditor handles this, but adding here ensures specific behavior for this mode if needed)
+                canvas.requestRenderAll();
                 canvas.on('mouse:down', (e) => {
                     if (!e.target) {
                         canvas.discardActiveObject();
                         canvas.requestRenderAll();
                     }
                 });
+
+                // FORCE UPDATE to fix font metrics race condition
+                setTimeout(() => {
+                    topLayer.forEach(obj => {
+                        if (obj instanceof fabric.Text) {
+                            obj.initDimensions();
+                        }
+                    });
+                    canvas.requestRenderAll();
+                }, 100);
+
+                setTimeout(() => {
+                    canvas.requestRenderAll();
+                }, 500);
 
                 canvas.requestRenderAll();
 

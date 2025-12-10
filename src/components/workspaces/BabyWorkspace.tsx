@@ -4,7 +4,7 @@ import { generateBabyTemplate, updateBabyHeader, updateCollageFilters, updateIma
 import type { TemplateType } from '../../utils/TemplateGenerators';
 import { transliterate } from '../../utils/Transliteration';
 import { exportHighRes } from '../../utils/ExportUtils';
-import { Upload, Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Type, User, Calendar, Sun } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Type, User, Calendar, Sun } from 'lucide-react';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
 
@@ -15,8 +15,8 @@ interface BabyWorkspaceProps {
 export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [images, setImages] = useState<{ id: string; url: string }[]>([]);
-    const [headerText, setHeaderText] = useState<string>("ГЕННАДИЕВИЧ");
-    const [footerName, setFooterName] = useState<string>("ИВАН");
+    const [headerText, setHeaderText] = useState<string>("GENNADIEVICH");
+    const [footerName, setFooterName] = useState<string>("IVAN");
     const [footerDate, setFooterDate] = useState<string>("05.09.2025");
     const [isTranslitEnabled, setIsTranslitEnabled] = useState<boolean>(true);
     const [isBWEnabled, setIsBWEnabled] = useState<boolean>(true);
@@ -43,7 +43,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
 
     const [originalValues, setOriginalValues] = useState<{
         header: string; name: string; date: string;
-    } | null>(null);
+    } | null>({ header: "ГЕННАДИЕВИЧ", name: "ИВАН", date: "05.09.2025" });
 
     const [isReady, setIsReady] = useState(false);
 
@@ -99,7 +99,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
     };
     useEffect(() => {
         if (isTranslitEnabled) {
-            setOriginalValues({ header: headerText, name: footerName, date: footerDate });
+            setOriginalValues(prev => prev || { header: headerText, name: footerName, date: footerDate });
             setHeaderText(prev => transliterate(prev).toUpperCase());
             setFooterName(prev => transliterate(prev).toUpperCase());
             setFooterDate(prev => transliterate(prev).toUpperCase());
@@ -108,7 +108,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                 setHeaderText(originalValues.header);
                 setFooterName(originalValues.name);
                 setFooterDate(originalValues.date);
-                setOriginalValues(null);
+                setOriginalValues(null); // Clears saved
             }
         }
     }, [isTranslitEnabled]);

@@ -7,7 +7,7 @@ const setDpi = (blob: Blob, dpi: number): Promise<Blob> => {
         reader.readAsArrayBuffer(blob);
         reader.onload = () => {
             const buffer = reader.result as ArrayBuffer;
-            const view = new DataView(buffer);
+            // const view = new DataView(buffer);
 
             // PNG Signature: 89 50 4E 47 0D 0A 1A 0A (8 bytes)
             // IHDR Chunk: Length (4), Type (4), Data (13), CRC (4) = 25 bytes
@@ -253,4 +253,64 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
 
 export const exportMockup = async (_canvas: any) => {
     console.log("Mockup export disabled");
+};
+
+export const exportSvgElement = async (svgElement: SVGSVGElement, filename: string) => {
+    try {
+        // 1. Serialize SVG to String
+        const serializer = new XMLSerializer();
+        let svgString = serializer.serializeToString(svgElement);
+
+        // 2. Encode to Base64
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+
+        // 3. Load into Image
+        const img = new Image();
+        const svgLoaded = new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = reject;
+        });
+        img.src = url;
+        await svgLoaded;
+
+        // 4. Draw to Canvas
+        // Use SVG's viewBox or BBox size
+        // The viewBox is 0 0 8085.14 2098.41
+        // We want High Res.
+        // Let's target the same 31cm @ 200DPI logic (approx 2441px width)
+        // Or better: Use native resolution of SVG (8085px width) for max quality.
+        // 8085px is huge (~68cm @ 300dpi). It's fine.
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 8085;
+        canvas.height = 2098;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // 5. Trim Transparency (Optional, but good)
+        const trimmedCanvas = trimTransparency(canvas);
+
+        // 6. Convert to Blob & Save
+        let blob = await new Promise<Blob | null>(resolve => trimmedCanvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error("Blob creation failed");
+
+        blob = await setDpi(blob, 200);
+
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `${filename}-${new Date().getTime()}.png`;
+        link.href = downloadUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+        URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error("SVG Export failed:", error);
+        alert("Ошибка при сохранении SVG. Проверьте консоль.");
+    }
 };

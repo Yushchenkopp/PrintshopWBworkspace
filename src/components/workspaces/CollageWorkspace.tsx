@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
-import { generateCollageTemplate, updateCollageHeader, updateCollageFilters, CONTENT_WIDTH, PADDING_SIDE } from '../../utils/TemplateGenerators';
+import { generateCollageTemplate, updateCollageHeader, updateCollageFilters } from '../../utils/TemplateGenerators';
 import type { TemplateType } from '../../utils/TemplateGenerators';
 import { transliterate } from '../../utils/Transliteration';
 import { exportHighRes } from '../../utils/ExportUtils';
@@ -192,7 +192,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         updateCollageFilters(canvas, isBWEnabled, brightness);
                     } else {
                         // Smart Update (Text Only)
-                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled);
+                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, debouncedSignatureText, isSignatureEnabled);
                     }
 
                     // Update refs

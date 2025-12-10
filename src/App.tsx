@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CollageWorkspace } from './components/workspaces/CollageWorkspace';
 import { PolaroidWorkspace } from './components/workspaces/PolaroidWorkspace';
+import { PapaWorkspace } from './components/workspaces/PapaWorkspace';
 import { JerseyWorkspace } from './components/workspaces/JerseyWorkspace';
 import { BabyWorkspace } from './components/workspaces/BabyWorkspace';
 import { type TemplateType } from './utils/TemplateGenerators';
@@ -15,12 +16,19 @@ function App() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-100">
+      <div className="font-preload">
+        Caveat Preload Text To Ensure Font Metrics Are Ready
+      </div>
       {template === 'collage' && (
         <CollageWorkspace onSwitchTemplate={handleSwitchTemplate} />
       )}
 
       {template === 'polaroid' && (
         <PolaroidWorkspace onSwitchTemplate={handleSwitchTemplate} />
+      )}
+
+      {template === 'papa' && (
+        <PapaWorkspace onSwitchTemplate={handleSwitchTemplate} />
       )}
 
       {template === 'jersey' && (

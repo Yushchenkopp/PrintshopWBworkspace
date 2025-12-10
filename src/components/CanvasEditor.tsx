@@ -4,10 +4,12 @@ import * as fabric from 'fabric';
 interface CanvasEditorProps {
     onCanvasReady: (canvas: fabric.Canvas) => void;
     logicalHeight?: number; // Optional prop to control logical height
+    logicalWidth?: number; // Optional prop to control logical width
+    padding?: number; // Optional padding override
     children?: React.ReactNode;
 }
 
-export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logicalHeight = 800, children }) => {
+export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logicalHeight = 800, logicalWidth = 2400, padding, children }) => {
     const canvasEl = useRef<HTMLCanvasElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const canvasInstance = useRef<fabric.Canvas | null>(null);
@@ -22,21 +24,24 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
     const lastMousePos = useRef({ x: 0, y: 0 });
 
     const logicalHeightRef = useRef(logicalHeight);
+    const logicalWidthRef = useRef(logicalWidth);
     const SCALE_FACTOR = 3;
-    const logicalWidth = 800 * SCALE_FACTOR;
-    const CANVAS_PADDING = 60 * SCALE_FACTOR; // Padding for controls
+    // const logicalWidth = 800 * SCALE_FACTOR; // REPLACED BY PROP
+    // Use provided padding or default calculation
+    const CANVAS_PADDING = padding !== undefined ? padding : (60 * SCALE_FACTOR); // Padding for controls
 
     // 1. Initialize Canvas (High-DPI)
     useEffect(() => {
         if (!canvasEl.current) return;
 
         const canvas = new fabric.Canvas(canvasEl.current, {
-            width: logicalWidth + CANVAS_PADDING * 2,
+            width: logicalWidthRef.current + CANVAS_PADDING * 2,
             height: logicalHeightRef.current + CANVAS_PADDING * 2,
             backgroundColor: 'transparent',
             preserveObjectStacking: true,
             selection: false, // Disable group selection (drag box)
-            enableRetinaScaling: true // High-DPI support
+            enableRetinaScaling: true, // High-DPI support
+            controlsAboveOverlay: true // Ensure controls are always on top (fixes clipping/hiding issues)
         });
 
         // Set viewport transform to shift content
@@ -161,6 +166,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
     // 2. Update Canvas Height
     useEffect(() => {
         logicalHeightRef.current = logicalHeight;
+        logicalWidthRef.current = logicalWidth;
         if (canvasInstance.current) {
             canvasInstance.current.setDimensions({
                 width: logicalWidth + CANVAS_PADDING * 2,
@@ -179,7 +185,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
         const viewportH = viewportRef.current.clientHeight;
 
         // Canvas dimensions (Padded)
-        const canvasW = logicalWidth + CANVAS_PADDING * 2;
+        const canvasW = logicalWidthRef.current + CANVAS_PADDING * 2;
         const canvasH = logicalHeight + CANVAS_PADDING * 2;
 
         // Padding 5%
@@ -197,7 +203,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
         setScale(fitScale);
         setPan({ x: initialX, y: initialY });
 
-    }, [logicalHeight]); // Re-run if logical height changes (template switch)
+    }, [logicalHeight, logicalWidth]); // Re-run if logical height/width changes
 
     // 4. Space Key Listener
     useEffect(() => {

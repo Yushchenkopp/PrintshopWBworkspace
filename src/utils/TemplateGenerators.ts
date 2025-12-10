@@ -658,8 +658,6 @@ export const generateBabyTemplate = async (
     cropScaleY: number = 1
 ): Promise<number> => {
     if (!canvas) return 800;
-    canvas.clear();
-    canvas.backgroundColor = '#ffffff';
 
     const count = images.length;
 

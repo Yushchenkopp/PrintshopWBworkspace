@@ -70,3 +70,10 @@
     zoom: 0.9;
   }
 }
+
+.font-preload {
+  font-family: 'Caveat', sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
