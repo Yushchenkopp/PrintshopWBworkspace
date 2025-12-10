@@ -253,28 +253,14 @@ export const generateCollageTemplate = async (
         innerGridHeight = maxPhotosInCol * (colWidth / aspectRatio);
     }
 
-    // --- RENDER BACKGROUND (Gap Insurance) ---
-    // Strategy: "Triple Protection"
-    // 1. Black Background fills any subpixel gaps between photos and border.
-    // CONDITION: Border enabled AND Text is White (Border not allowed on Black text)
-    const isBorderActive = isBorderEnabled && textColor === '#FFFFFF';
+    // --- RENDER BACKGROUND ---
+    // Removed legacy 'black fill' logic (lines 262-277) to prevent 1px lines between photos.
+    // We now use Composite Border on top.
 
-    if (isBorderActive && innerGridHeight > 0) {
-        // Total Grid Height includes the border padding
-        const totalBgHeight = innerGridHeight + (BORDER_WIDTH * 2);
-
-        const bgRect = new fabric.Rect({
-            left: PADDING_SIDE,
-            top: gridTop,
-            width: CONTENT_WIDTH,
-            height: totalBgHeight,
-            fill: '#000000', // Black "Seam Filler"
-            selectable: false,
-            evented: false,
-            name: 'collage-bg-fill'
-        });
-        canvas.add(bgRect);
-    }
+    // Define isBorderActive at TOP LEVEL (if needed for Overlap logic)
+    // But we WANT overlap now to close gaps.
+    // So OVERLAP should be 2 regardless of border.
+    const OVERLAP = 2; // Always bleed to close gaps
 
     // --- RENDER IMAGES ---
     let imageIndex = 0;
@@ -302,12 +288,9 @@ export const generateCollageTemplate = async (
                 const top = gridTop + BORDER_WIDTH + (row * photoHeight) + (photoHeight / 2);
 
                 // DUAL LOGIC: Strip Gaps vs Strict Border
-                // 1. Border Active: STRICT Mode. overflow: hidden logic. No overlap. 
-                //    We rely on the Black Background to fill gaps if any (but strict math should suffice).
-                // 2. Border Inactive: BLEED Mode. 
-                //    We need overlap to cover subpixel white lines between photos.
-
-                const OVERLAP = isBorderActive ? 0 : 2;
+                // REVISED: Always use OVERLAP = 2 to close internal gaps.
+                // The Composite Border (drawn on top) will mask the outer edges.
+                // const OVERLAP = 2; // Defined above
 
                 const scaleX = (colWidth + OVERLAP) / img.width!;
                 const scaleY = (photoHeight + OVERLAP) / img.height!;
@@ -463,46 +446,43 @@ export const generateCollageTemplate = async (
         }
     }
 
-    // Border Logic: Hybrid "Padding + Stroke"
-    // Geometry: Photos are already shifted by Padding (BORDER_WIDTH = 2).
-    // Rendering: We draw a crisp 2px Stroke in that empty space.
-    // CONDITION: Border enabled AND Text is White
-    if (isBorderEnabled && count > 0 && textColor === '#FFFFFF') {
-        const borderStrokeWidth = 2; // Exact 2px
-        const halfStroke = borderStrokeWidth / 2;
+    // Border Logic for Footer Version (Height includes grid)
+    // 4. Border Logic (Composite 4 Rects) - MOVED HERE FOR Z-INDEX (TOP LAYER)
+    const isBorderActive = isBorderEnabled && textColor === '#FFFFFF' && innerGridHeight > 0;
 
-        // Total Grid area (Inner + Borders)
-        const totalGridHeight = innerGridHeight + (BORDER_WIDTH * 2);
+    if (isBorderActive) {
+        // Precise Frame Border (Composite 4 Rects)
+        const borderThickness = 3;
 
-        // Outer Bounds (Exact integers)
-        const boundsLeft = Math.round(PADDING_SIDE);
-        const boundsTop = Math.round(gridTop);
-        const boundsWidth = Math.round(CONTENT_WIDTH);
-        const boundsHeight = Math.round(totalGridHeight);
+        // REVISED STRATEGY: 4 Rects framing the Total Area.
+        const frameLeft = PADDING_SIDE;
+        const frameTop = gridTop;
+        const frameW = CONTENT_WIDTH;
+        const frameH = innerGridHeight + (BORDER_WIDTH * 2);
 
-        // Inset Stroke Props (`box-shadow: inset 0 0 0 2px`)
-        // Path Center = Edge + 1px.
-        // Size = Outer - 2px.
-        const borderLeft = boundsLeft + halfStroke;
-        const borderTop = boundsTop + halfStroke;
-        const borderWidth = boundsWidth - borderStrokeWidth;
-        const borderHeight = boundsHeight - borderStrokeWidth;
-
-        const border = new fabric.Rect({
-            left: borderLeft,
-            top: borderTop,
-            width: borderWidth,
-            height: borderHeight,
-            fill: 'transparent', // No fill (paper background shows? actually photos cover inner, this covers gap)
-            stroke: '#000000',   // Crisp Stroke
-            strokeWidth: borderStrokeWidth,
+        // Helper
+        const createBorderPart = (name: string, l: number, t: number, w: number, h: number) => new fabric.Rect({
+            fill: '#000000',
+            strokeWidth: 0,
             selectable: false,
             evented: false,
             objectCaching: false,
-            strokeUniform: true,
-            name: 'collage-border'
+            name: name,
+            left: l, top: t, width: w, height: h,
+            originX: 'left', originY: 'top'
         });
-        canvas.add(border);
+
+        // TOP
+        canvas.add(createBorderPart('collage-border-top', frameLeft, frameTop, frameW, borderThickness));
+
+        // BOTTOM
+        canvas.add(createBorderPart('collage-border-bottom', frameLeft, frameTop + frameH - borderThickness, frameW, borderThickness));
+
+        // LEFT
+        canvas.add(createBorderPart('collage-border-left', frameLeft, frameTop, borderThickness, frameH));
+
+        // RIGHT
+        canvas.add(createBorderPart('collage-border-right', frameLeft + frameW - borderThickness, frameTop, borderThickness, frameH));
     }
 
     canvas.requestRenderAll();
