@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CollageWorkspace } from './components/workspaces/CollageWorkspace';
 import { PolaroidWorkspace } from './components/workspaces/PolaroidWorkspace';
 import { JerseyWorkspace } from './components/workspaces/JerseyWorkspace';
+import { BabyWorkspace } from './components/workspaces/BabyWorkspace';
 import { type TemplateType } from './utils/TemplateGenerators';
 
 function App() {
@@ -24,6 +25,10 @@ function App() {
 
       {template === 'jersey' && (
         <JerseyWorkspace onSwitchTemplate={handleSwitchTemplate} />
+      )}
+
+      {template === 'baby' && (
+        <BabyWorkspace onSwitchTemplate={handleSwitchTemplate} />
       )}
     </div>
   );
