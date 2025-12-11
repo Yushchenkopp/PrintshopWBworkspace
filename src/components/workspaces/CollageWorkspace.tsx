@@ -4,7 +4,7 @@ import { generateCollageTemplate, updateCollageHeader, updateCollageFilters } fr
 import type { TemplateType } from '../../utils/TemplateGenerators';
 import { transliterate } from '../../utils/Transliteration';
 import { exportHighRes } from '../../utils/ExportUtils';
-import { Upload, Trash2, ImagePlus, ArrowDownToLine, Sun, Type, User, Calendar, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, Sun, Type, User, Calendar, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus } from 'lucide-react';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
 import {
@@ -20,8 +20,11 @@ import {
     arrayMove,
     SortableContext,
     sortableKeyboardCoordinates,
-    rectSortingStrategy
+    rectSortingStrategy,
+    horizontalListSortingStrategy,
+    useSortable
 } from '@dnd-kit/sortable';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { SortablePhoto } from '../SortablePhoto';
 
 interface CollageWorkspaceProps {
@@ -30,6 +33,7 @@ interface CollageWorkspaceProps {
 
 export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemplate }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
+    const [parent] = useAutoAnimate();
     const [images, setImages] = useState<{ id: string; url: string }[]>([]);
     const [headerText, setHeaderText] = useState<string>("GIRLFRIEND");
     const [footerName, setFooterName] = useState<string>("VALERIA");
@@ -46,6 +50,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const [isSignatureEnabled, setIsSignatureEnabled] = useState<boolean>(false);
     const [isBorderEnabled, setIsBorderEnabled] = useState<boolean>(false); // Canvas State (Delayed)
     const [visualBorderEnabled, setVisualBorderEnabled] = useState<boolean>(false); // UI State (Instant)
+    const [signatureScale, setSignatureScale] = useState<number>(1);
 
     // Debounce signature text
     const [debouncedSignatureText, setDebouncedSignatureText] = useState<string>('WANNA BE YOURS');
@@ -155,7 +160,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
         headerLines: 2,
         signatureText: 'WANNA BE YOURS',
         isSignatureEnabled: false,
-        isBorderEnabled: false
+        isBorderEnabled: false,
+        signatureScale: 1
     });
 
     const lastDateRef = useRef('05.09.2025');
@@ -180,7 +186,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     if (isStructureChanged || images.length === 0) { // Force render if empty to show placeholder
                         // Full Re-render
                         const imageUrls = images.map(img => img.url);
-                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled);
+                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale);
                         setLogicalCanvasHeight(newHeight);
 
                         // Reveal canvas after first render and layout adjustment
@@ -192,7 +198,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         updateCollageFilters(canvas, isBWEnabled, brightness);
                     } else {
                         // Smart Update (Text Only)
-                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, debouncedSignatureText, isSignatureEnabled);
+                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, debouncedSignatureText, isSignatureEnabled, signatureScale);
                     }
 
                     // Update refs
@@ -204,7 +210,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         headerLines,
                         signatureText,
                         isSignatureEnabled,
-                        isBorderEnabled
+                        isBorderEnabled,
+                        signatureScale
                     };
                 } catch (error) {
                     console.error("Error rendering template:", error);
@@ -212,7 +219,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled]);
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale]);
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -247,13 +254,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     </div>
                 </div>
                 <section>
-                    <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ФОТО</h2>
-                        <label className="p-1.5 bg-zinc-100/50 hover:bg-zinc-200/50 rounded-lg cursor-pointer transition-colors text-zinc-600">
-                            <Upload className="w-3.5 h-3.5" />
-                            <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageUpload} />
-                        </label>
-                    </div>
+
                     {images.length === 0 ? (
                         <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
                             <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageUpload} />
@@ -270,7 +271,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                 items={images.map(img => img.id)}
                                 strategy={rectSortingStrategy}
                             >
-                                <div className="grid grid-cols-4 gap-2">
+                                <div ref={parent} className={images.length > 7 ? "grid grid-rows-2 grid-flow-col auto-cols-max gap-2 overflow-x-auto pb-2 px-3 snap-x custom-scrollbar" : "grid grid-cols-4 gap-2"}>
                                     {images.map((img, idx) => (
                                         <SortablePhoto
                                             key={img.id}
@@ -278,14 +279,19 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                             url={img.url}
                                             index={idx + 1}
                                             onRemove={() => handleRemoveImage(img.id)}
+                                            className={images.length > 7 ? "w-20 shrink-0 snap-start" : ""}
                                         />
                                     ))}
+                                    <label className={`aspect-square flex items-center justify-center border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[10px] cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md transform-gpu group ${images.length > 7 ? "w-20 shrink-0 snap-start" : ""}`}>
+                                        <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageUpload} />
+                                        <Plus className="w-6 h-6 text-zinc-400 group-hover:text-zinc-600 transition-colors transform-gpu" />
+                                    </label>
                                 </div>
                             </SortableContext>
                         </DndContext>
                     )}
                     {images.length > 0 && (
-                        <button onClick={handleClearCanvas} className="mt-8 text-xs text-zinc-400 font-medium flex items-center gap-1 hover:bg-red-50 hover:text-red-600 rounded-md px-2 py-1 cursor-pointer">
+                        <button onClick={handleClearCanvas} className="mt-4 text-[10px] text-zinc-400 font-medium flex items-center gap-1 hover:bg-red-50 hover:text-red-600 rounded-md px-2 py-1 cursor-pointer transition-colors">
                             <Trash2 className="w-3 h-3" /> Очистить всё
                         </button>
                     )}
@@ -384,54 +390,33 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                 + подпись
                             </button>
                         ) : (
-                            <div className="relative mt-2">
+                            <div className="flex gap-2 mt-2 h-[72px]">
                                 <textarea
                                     value={signatureText}
                                     onChange={(e) => handleTextChange(setSignatureText, e.target.value)}
-                                    className="w-full px-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 resize-none"
+                                    className="flex-1 px-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 resize-none h-full"
                                     placeholder="WANNA BE YOURS"
-                                    rows={3}
-                                    style={{ minHeight: '60px' }}
                                 />
-                                {/* Optional: Click to remove/hide if empty? Staying simpler for now. */}
+                                <div className="w-8 flex items-center justify-center relative">
+                                    <input
+                                        type="range"
+                                        min="0.5"
+                                        max="2.0"
+                                        step="0.1"
+                                        value={signatureScale}
+                                        onChange={(e) => setSignatureScale(parseFloat(e.target.value))}
+                                        className="absolute w-[72px] h-2 -rotate-90 origin-center cursor-pointer appearance-none bg-zinc-200 rounded-lg [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 transition-all hover:[&::-webkit-slider-thumb]:scale-110"
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
 
                     {/* Settings Row: Since + Translit */}
-                    <div className="flex items-center gap-4 mb-3 px-1">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">SINCE</span>
-                            <button
-                                onClick={() => {
-                                    const newValue = !isSinceEnabled;
-                                    setIsSinceEnabled(newValue);
-                                    if (!newValue) {
-                                        if (footerDate) lastDateRef.current = footerDate;
-                                        setFooterDate('');
-                                    } else {
-                                        setFooterDate(lastDateRef.current || '05.09.2025');
-                                    }
-                                }}
-                                className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isSinceEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                            >
-                                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isSinceEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                            </button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">ТРАНСЛИТ</span>
-                            <button
-                                onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
-                                className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                            >
-                                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="mt-6 flex items-center justify-between">
+                    {/* Settings Row: Color + Since + Translit */}
+                    <div className="flex flex-wrap items-center justify-between gap-y-2 mb-3 px-1 h-8">
+                        {/* Color Group */}
                         <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ЦВЕТ</span>
                             <div className="flex items-center">
                                 <div className="flex gap-2">
                                     <button
@@ -472,26 +457,55 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                             </div>
                         </div>
 
-
+                        {/* Since + Translit Group */}
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Since</span>
+                                <button
+                                    onClick={() => {
+                                        const newValue = !isSinceEnabled;
+                                        setIsSinceEnabled(newValue);
+                                        if (!newValue) {
+                                            if (footerDate) lastDateRef.current = footerDate;
+                                            setFooterDate('');
+                                        } else {
+                                            setFooterDate(lastDateRef.current || '05.09.2025');
+                                        }
+                                    }}
+                                    className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isSinceEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isSinceEnabled ? 'left-[14px]' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Транслит</span>
+                                <button
+                                    onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
+                                    className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[14px]' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="mt-6">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-2 px-1">
                             <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-1">
+                                <span className="text-xs font-bold text-zinc-500 tracking-wide flex items-center gap-1">
                                     <Sun className="w-3 h-3" /> Яркость
                                 </span>
                                 <span className="text-[10px] font-medium text-zinc-400">{(brightness * 100).toFixed(0)}%</span>
                             </div>
 
                             {/* B/W Toggle (Moved here) */}
-                            <div className="flex items-center gap-2 scale-90 origin-right">
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Ч/Б</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Ч/Б</span>
                                 <button
                                     onClick={() => setIsBWEnabled(!isBWEnabled)}
-                                    className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isBWEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                                    className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isBWEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
                                 >
-                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isBWEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isBWEnabled ? 'left-[14px]' : 'left-0.5'}`} />
                                 </button>
                             </div>
                         </div>

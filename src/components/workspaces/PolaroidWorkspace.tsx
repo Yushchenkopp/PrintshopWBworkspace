@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { Upload, Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Sun } from 'lucide-react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
 import {
@@ -33,6 +34,7 @@ const TEMPLATE_URL = '/templates/polaroids-bg.png';
 
 export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
+    const [parent] = useAutoAnimate();
     // Fixed 2 slots for Polaroid: [Left, Right]
     const [images, setImages] = useState<({ id: string; url: string } | null)[]>([null, null]);
     const [isReady, setIsReady] = useState(false);
@@ -505,9 +507,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 </div>
 
                 <section>
-                    <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ТЕКСТ</h2>
-                    </div>
+
                     <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px]">
                         {/* Sliding Indicator */}
                         <div
@@ -530,15 +530,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 </section>
 
                 <section>
-                    <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ФОТО</h2>
-                        <label className="p-1.5 bg-zinc-100/50 hover:bg-zinc-200/50 rounded-lg cursor-pointer transition-colors text-zinc-600">
-                            <Upload className="w-3.5 h-3.5" />
-                            <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => {
-                                handleImageUpload(e);
-                            }} />
-                        </label>
-                    </div>
+
                     {images.every(img => img === null) ? (
                         <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
                             <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => {
@@ -550,7 +542,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                     ) : (
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                             <SortableContext items={images.filter((i): i is { id: string; url: string } => i !== null).map(img => img.id)} strategy={rectSortingStrategy}>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div ref={parent} className="grid grid-cols-4 gap-2">
                                     {images.map((img, idx) => (
                                         img ? (
                                             <SortablePhoto
@@ -562,6 +554,12 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                                             />
                                         ) : null
                                     ))}
+                                    {images.filter(x => x !== null).length < 2 && (
+                                        <label className="aspect-square flex items-center justify-center border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[10px] cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md transform-gpu group">
+                                            <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => handleImageUpload(e)} />
+                                            <Plus className="w-6 h-6 text-zinc-400 group-hover:text-zinc-600 transition-colors transform-gpu" />
+                                        </label>
+                                    )}
                                 </div>
                             </SortableContext>
                         </DndContext>
@@ -592,8 +590,8 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
                 <section>
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-1">
-                            Яркость
+                        <span className="text-xs font-bold text-zinc-500 tracking-wide flex items-center gap-1">
+                            <Sun className="w-3 h-3" /> Яркость
                         </span>
                         <span className="text-[10px] font-medium text-zinc-400">{(brightness * 100).toFixed(0)}%</span>
                     </div>

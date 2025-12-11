@@ -1,7 +1,8 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import * as fabric from 'fabric';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, ImagePlus, Upload, Trash2, Sun } from 'lucide-react';
+import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, ImagePlus, Trash2, Sun, Plus } from 'lucide-react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import heic2any from 'heic2any';
 import { exportHighRes } from '../../utils/ExportUtils';
 import { CanvasEditor } from '../CanvasEditor';
@@ -45,6 +46,7 @@ const MAMA_PATHS = [PATH_M1, PATH_A_MAMA_1, PATH_M2, PATH_A_MAMA_2];
 
 export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
+    const [parent] = useAutoAnimate();
     const [images, setImages] = useState<({ id: string; url: string } | null)[]>([null, null, null, null]);
     const [isGrayscale, setIsGrayscale] = useState(false);
     const [brightness, setBrightness] = useState(0);
@@ -452,12 +454,12 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
             {/* --- SIDEBAR --- */}
             <aside className="sidebar-panel">
-                <div className="flex justify-center mb-6">
+                <div className="flex justify-center">
                     <img src="/logo.png" alt="Logo" className="w-40 opacity-80 drop-shadow-xl object-contain" />
                 </div>
 
                 {/* Workspace Switcher */}
-                <div className="grid grid-cols-3 gap-2 mb-6">
+                <div className="grid grid-cols-3 gap-2">
                     {[
                         { id: 'collage', icon: LayoutDashboard, label: 'Коллаж' },
                         { id: 'polaroid', icon: BookHeart, label: 'Полароид' },
@@ -478,7 +480,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                 </div>
 
                 {/* TEMPLATE TOGGLE (PAPA / MAMA) - Polaroid Style */}
-                <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-6">
+                <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px]">
                     {/* Sliding Indicator */}
                     <div
                         className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-[6px] shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${templateMode === 'PAPA' ? 'left-1' : 'left-[calc(50%)]'}`}
@@ -499,13 +501,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                 </div>
 
                 <section>
-                    <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ФОТО ({templateMode})</h2>
-                        <label className="p-1.5 bg-zinc-100/50 hover:bg-zinc-200/50 rounded-lg cursor-pointer transition-colors text-zinc-600">
-                            <Upload className="w-3.5 h-3.5" />
-                            <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => handleImageUpload(e)} />
-                        </label>
-                    </div>
+
 
                     {images.every(img => img === null) ? (
                         <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
@@ -516,7 +512,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                     ) : (
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                             <SortableContext items={images.filter((i): i is { id: string; url: string } => i !== null).map(img => img.id)} strategy={rectSortingStrategy}>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div ref={parent} className="grid grid-cols-4 gap-2">
                                     {images.map((img, idx) => (
                                         img ? (
                                             <SortablePhoto
@@ -528,6 +524,12 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                                             />
                                         ) : null
                                     ))}
+                                    {images.filter(x => x !== null).length < 4 && (
+                                        <label className="aspect-square flex items-center justify-center border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[10px] cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md transform-gpu group">
+                                            <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => handleImageUpload(e)} />
+                                            <Plus className="w-6 h-6 text-zinc-400 group-hover:text-zinc-600 transition-colors transform-gpu" />
+                                        </label>
+                                    )}
                                 </div>
                             </SortableContext>
                         </DndContext>
@@ -552,12 +554,12 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                     ))}
                 </section>
 
-                <section className="mt-8">
+                <section>
                     <div className="flex flex-col gap-4">
                         {/* Brightness Control */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-1">
+                                <span className="text-xs font-bold text-zinc-500 tracking-wide flex items-center gap-1">
                                     <Sun className="w-3 h-3" /> Яркость
                                 </span>
                                 <span className="text-[10px] font-medium text-zinc-400">{(brightness * 100).toFixed(0)}%</span>
@@ -576,7 +578,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                         <div className="flex items-center justify-between">
                             {/* B/W Toggle */}
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Ч/Б</span>
+                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Ч/Б</span>
                                 <button
                                     onClick={() => setIsGrayscale(!isGrayscale)}
                                     className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isGrayscale ? 'bg-zinc-900' : 'bg-zinc-200'}`}
@@ -587,7 +589,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
 
                             {/* Border Toggle */}
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Обводка</span>
+                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Обводка</span>
                                 <button
                                     onClick={() => setIsBorderEnabled(!isBorderEnabled)}
                                     className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isBorderEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}

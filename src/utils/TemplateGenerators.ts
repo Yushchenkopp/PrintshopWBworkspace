@@ -102,7 +102,8 @@ export const generateCollageTemplate = async (
     headerLines: number = 2,
     signatureTextValue: string = 'WANNA BE YOURS', // New
     isSignatureEnabled: boolean = false, // New
-    isBorderEnabled: boolean = false // New Border logic
+    isBorderEnabled: boolean = false, // New Border logic
+    signatureScale: number = 1 // New Scale
 ): Promise<number> => {
     if (!canvas) return 800;
 
@@ -398,7 +399,7 @@ export const generateCollageTemplate = async (
             width: signatureWidth,
             fontFamily: 'Arial',
             fontWeight: 'bold',
-            fontSize: signatureFontSize,
+            fontSize: signatureFontSize * signatureScale,
             fill: textColor,
             textAlign: 'right',
             originX: 'right',
@@ -506,7 +507,8 @@ export const updateCollageHeader = (
     textColor: string,
     // headerLines (param reserved for compatibility)
     signatureTextValue: string, // New
-    isSignatureEnabled: boolean // New
+    isSignatureEnabled: boolean, // New
+    signatureScale: number = 1 // New Scale
 ) => {
     if (!canvas) return;
 
@@ -597,7 +599,15 @@ export const updateCollageHeader = (
     const signature = canvas.getObjects().find((obj: any) => obj.name === 'footer-signature');
 
     if (isSignatureEnabled && signature) {
-        signature.set({ text: signatureTextValue, fill: textColor, visible: true });
+        // Apply Scale to existing object if needed, or re-render text
+        // Textbox fontSize update:
+        const baseFontSize = 28 * SCALE_FACTOR;
+        signature.set({
+            text: signatureTextValue,
+            fill: textColor,
+            visible: true,
+            fontSize: baseFontSize * signatureScale
+        });
 
         // Update Position based on Name
         const footerTop = footerName ? footerName.top : 0; // Fallback
