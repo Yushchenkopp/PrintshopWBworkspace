@@ -276,11 +276,11 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     <img
                         src="/logo.png"
                         alt="Logo"
-                        className="w-40 opacity-80 drop-shadow-xl object-contain"
+                        className="w-[90px] opacity-80 drop-shadow-xl object-contain"
                     />
                 </div>
                 <div className="">
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="flex flex-row justify-between w-full">
                         {[
                             { id: 'collage', icon: LayoutDashboard, label: 'Коллаж' },
                             { id: 'polaroid', icon: BookHeart, label: 'Полароид' },
@@ -292,10 +292,10 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                             <button
                                 key={item.id}
                                 onClick={() => onSwitchTemplate(item.id as TemplateType)}
-                                className={`aspect-square flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'collage' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:scale-105 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
+                                className={`w-[44px] h-[44px] flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'collage' ? 'bg-zinc-900 text-white shadow-md p-[3px]' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
                                 title={item.label}
                             >
-                                <item.icon className="w-5 h-5" />
+                                <item.icon className="w-[18px] h-[18px] transform-gpu will-change-transform antialiased [backface-visibility:hidden] [transform:translateZ(0)]" />
                             </button>
                         ))}
                     </div>
@@ -303,7 +303,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                 <section>
 
                     {images.length === 0 ? (
-                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
+                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-[110px] flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
                             <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageUpload} />
                             <ImagePlus className="w-8 h-8 text-zinc-300 mb-2 group-hover:text-zinc-400 transition-colors" />
                             <span className="text-sm font-medium text-zinc-600">Загрузить фото</span>
@@ -345,7 +345,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                 </section>
 
                 <section>
-                    <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-4">
+                    <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-8">
                         {/* Sliding Indicator */}
                         <div
                             className="absolute top-1 bottom-1 w-[calc(25%-4px)] bg-white rounded-[6px] shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
@@ -369,7 +369,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     </div>
 
                     {/* Header Row: Input + Lines Control */}
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex gap-2 mb-4">
                         {/* Header Input */}
                         <div className="relative group flex-1">
                             <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
@@ -428,7 +428,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     </div>
 
                     {/* Signature Ghost Button / Field */}
-                    <div className="mt-1 mb-3">
+                    <div className="mt-4 mb-8">
                         {!isSignatureEnabled ? (
                             <button
                                 onClick={() => setIsSignatureEnabled(true)}
@@ -506,7 +506,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
 
                         {/* Since + Translit Group */}
                         <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Since</span>
                                 <button
                                     onClick={() => {
@@ -524,7 +524,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isSinceEnabled ? 'left-[14px]' : 'left-0.5'}`} />
                                 </button>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Транслит</span>
                                 <button
                                     onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
@@ -546,7 +546,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                             </div>
 
                             {/* B/W Toggle (Moved here) */}
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Ч/Б</span>
                                 <button
                                     onClick={() => setIsBWEnabled(!isBWEnabled)}

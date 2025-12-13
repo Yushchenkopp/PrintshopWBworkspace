@@ -1,3 +1,4 @@
+import UPNG from 'upng-js';
 import * as fabric from 'fabric';
 
 // Helper to set DPI in PNG Blob
@@ -226,10 +227,15 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
         const fullCanvas = await loadDataURLToCanvas(dataURL);
         const trimmedCanvas = trimTransparency(fullCanvas);
 
-        // 8. Convert to Blob
-        let blob = await new Promise<Blob | null>(resolve => trimmedCanvas.toBlob(resolve, 'image/png'));
+        // 8. Convert to Blob (Optimized with UPNG)
+        const ctx = trimmedCanvas.getContext('2d');
+        if (!ctx) throw new Error("Could not get context for trimmed canvas");
 
-        if (!blob) throw new Error("Blob creation failed");
+        const imgData = ctx.getImageData(0, 0, trimmedCanvas.width, trimmedCanvas.height);
+        // Optimize: 256 colors (lossy but high quality)
+        const upngBuffer = UPNG.encode([imgData.data.buffer], trimmedCanvas.width, trimmedCanvas.height, 256);
+
+        let blob: Blob | null = new Blob([upngBuffer], { type: 'image/png' });
 
         // 9. Inject DPI Metadata
         blob = await setDpi(blob, 200);

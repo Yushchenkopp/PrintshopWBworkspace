@@ -55,7 +55,7 @@
 
 /* Global Sidebar Responsiveness */
 .sidebar-panel {
-  @apply fixed left-6 top-6 flex flex-col gap-6 overflow-y-auto z-[100] p-6 rounded-3xl border backdrop-blur-2xl;
+  @apply fixed left-6 top-6 flex flex-col gap-8 overflow-y-auto z-[100] px-6 pt-6 pb-6 rounded-3xl border backdrop-blur-2xl;
 
   /* Arbitrary values that fail in @apply */
   width: 400px;

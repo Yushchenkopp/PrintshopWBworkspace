@@ -12,11 +12,11 @@ export const ConstructorWorkspace: React.FC<ConstructorWorkspaceProps> = ({ onSw
             {/* --- SIDEBAR --- */}
             <aside className="sidebar-panel">
                 <div className="flex justify-center">
-                    <img src="/logo.png" alt="Logo" className="w-40 opacity-80 drop-shadow-xl object-contain" />
+                    <img src="/logo.png" alt="Logo" className="w-[90px] opacity-80 drop-shadow-xl object-contain" />
                 </div>
 
                 {/* Workspace Switcher */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-row justify-between w-full">
                     {[
                         { id: 'collage', icon: LayoutDashboard, label: 'Коллаж' },
                         { id: 'polaroid', icon: BookHeart, label: 'Полароид' },
@@ -28,10 +28,10 @@ export const ConstructorWorkspace: React.FC<ConstructorWorkspaceProps> = ({ onSw
                         <button
                             key={item.id}
                             onClick={() => onSwitchTemplate(item.id as TemplateType)}
-                            className={`aspect-square flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'constructor' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:scale-105 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
+                            className={`w-[44px] h-[44px] flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'constructor' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
                             title={item.label}
                         >
-                            <item.icon className="w-5 h-5" />
+                            <item.icon className="w-[18px] h-[18px] transform-gpu will-change-transform antialiased [backface-visibility:hidden] [transform:translateZ(0)]" />
                         </button>
                     ))}
                 </div>
@@ -46,14 +46,12 @@ export const ConstructorWorkspace: React.FC<ConstructorWorkspaceProps> = ({ onSw
                 </div>
 
                 <div className="relative z-10 text-center max-w-lg mx-auto bg-white/60 backdrop-blur-xl p-12 rounded-3xl border border-white/50 shadow-2xl">
-                    <div className="inline-flex items-center justify-center w-20 h-20 mb-6 bg-zinc-900 text-white rounded-2xl shadow-lg rotate-3 transition-transform hover:rotate-6 hover:scale-105 cursor-default">
+                    <div className="inline-flex items-center justify-center w-20 h-20 mb-8 bg-zinc-900 text-white rounded-2xl shadow-lg rotate-3 transition-transform hover:rotate-6 hover:scale-105 cursor-default">
                         <Hammer className="w-10 h-10" strokeWidth={1.5} />
                     </div>
 
-                    <h1 className="text-3xl font-bold text-zinc-800 mb-3 tracking-tight">Раздел в разработке</h1>
-                    <p className="text-zinc-500 text-lg leading-relaxed mb-8">
-                        Мы работаем над чем-то особенным. <br />Конструктор скоро появится здесь, чтобы дать вам полную свободу творчества.
-                    </p>
+                    <h1 className="text-3xl font-bold text-zinc-800 mb-8 tracking-tight">Раздел в разработке</h1>
+
 
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-full text-zinc-500 text-sm font-medium border border-zinc-200">
                         <Construction className="w-4 h-4" />

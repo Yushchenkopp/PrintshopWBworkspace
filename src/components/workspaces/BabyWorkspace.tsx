@@ -314,11 +314,11 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                     <img
                         src="/logo.png"
                         alt="Logo"
-                        className="w-40 opacity-80 drop-shadow-xl object-contain"
+                        className="w-[90px] opacity-80 drop-shadow-xl object-contain"
                     />
                 </div>
                 <div className="">
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="flex flex-row justify-between w-full">
                         {[
                             { id: 'collage', icon: LayoutDashboard, label: 'Коллаж' },
                             { id: 'polaroid', icon: BookHeart, label: 'Полароид' },
@@ -330,10 +330,10 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                             <button
                                 key={item.id}
                                 onClick={() => onSwitchTemplate(item.id as TemplateType)}
-                                className={`aspect-square flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'baby' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:scale-105 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
+                                className={`w-[44px] h-[44px] flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'baby' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
                                 title={item.label}
                             >
-                                <item.icon className="w-5 h-5" />
+                                <item.icon className="w-[18px] h-[18px] transform-gpu will-change-transform antialiased [backface-visibility:hidden] [transform:translateZ(0)]" />
                             </button>
                         ))}
                     </div>

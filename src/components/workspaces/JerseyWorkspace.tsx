@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool } from 'lucide-react';
+import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Type, Hash } from 'lucide-react';
 import * as fabric from 'fabric';
 import { exportHighRes } from '../../utils/ExportUtils';
 
@@ -206,11 +206,11 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
             {/* SIDEBAR */}
             <aside className="sidebar-panel">
                 <div className="flex justify-center">
-                    <img src="/logo.png" alt="Logo" className="w-40 opacity-80 drop-shadow-xl object-contain" />
+                    <img src="/logo.png" alt="Logo" className="w-[90px] opacity-80 drop-shadow-xl object-contain" />
                 </div>
 
                 {/* Navigation Grid */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-row justify-between w-full">
                     {[
                         { id: 'collage', icon: LayoutDashboard, label: 'Коллаж' },
                         { id: 'polaroid', icon: BookHeart, label: 'Полароид' },
@@ -222,10 +222,10 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         <button
                             key={item.id}
                             onClick={() => onSwitchTemplate(item.id as TemplateType)}
-                            className={`aspect-square flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'jersey' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:scale-105 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
+                            className={`w-[44px] h-[44px] flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'jersey' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
                             title={item.label}
                         >
-                            <item.icon className="w-5 h-5" />
+                            <item.icon className="w-[18px] h-[18px] transform-gpu will-change-transform antialiased [backface-visibility:hidden] [transform:translateZ(0)]" />
                         </button>
                     ))}
                 </div>
@@ -253,24 +253,24 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         </button>
                     </div>
 
-                    <div className="space-y-1">
-
+                    <div className="relative group w-full mb-3">
+                        <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                         <input
                             type="text"
                             value={surname}
                             onChange={handleSurnameChange}
-                            className="w-full px-4 py-3 bg-white/50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all uppercase text-zinc-800 placeholder-zinc-300"
+                            className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 uppercase"
                             placeholder="NAME"
                         />
                     </div>
 
-                    <div className="space-y-1">
-
+                    <div className="relative group w-full mb-3">
+                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                         <input
-                            type="text" // using text to allow 0 or special chars if needed, though usually numbers
+                            type="text"
                             value={number}
                             onChange={handleNumberChange}
-                            className="w-full px-4 py-3 bg-white/50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all text-lg text-zinc-800 placeholder-zinc-300"
+                            className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
                             placeholder="10"
                             maxLength={2}
                         />
