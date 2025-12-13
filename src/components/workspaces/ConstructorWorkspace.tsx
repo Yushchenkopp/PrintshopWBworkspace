@@ -1,0 +1,66 @@
+import React from 'react';
+import { type TemplateType } from '../../utils/TemplateGenerators';
+import { LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Hammer, Construction } from 'lucide-react';
+
+interface ConstructorWorkspaceProps {
+    onSwitchTemplate: (template: TemplateType) => void;
+}
+
+export const ConstructorWorkspace: React.FC<ConstructorWorkspaceProps> = ({ onSwitchTemplate }) => {
+    return (
+        <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+            {/* --- SIDEBAR --- */}
+            <aside className="sidebar-panel">
+                <div className="flex justify-center">
+                    <img src="/logo.png" alt="Logo" className="w-40 opacity-80 drop-shadow-xl object-contain" />
+                </div>
+
+                {/* Workspace Switcher */}
+                <div className="grid grid-cols-3 gap-2">
+                    {[
+                        { id: 'collage', icon: LayoutDashboard, label: 'Коллаж' },
+                        { id: 'polaroid', icon: BookHeart, label: 'Полароид' },
+                        { id: 'papa', icon: SquareParking, label: 'PAPA' },
+                        { id: 'baby', icon: SquareUser, label: 'Отчество' },
+                        { id: 'jersey', icon: Volleyball, label: 'Спорт' },
+                        { id: 'constructor', icon: PenTool, label: 'Конструктор' }
+                    ].map((item) => (
+                        <button
+                            key={item.id}
+                            onClick={() => onSwitchTemplate(item.id as TemplateType)}
+                            className={`aspect-square flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'constructor' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:scale-105 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
+                            title={item.label}
+                        >
+                            <item.icon className="w-5 h-5" />
+                        </button>
+                    ))}
+                </div>
+            </aside>
+
+            {/* --- MAIN CONTENT --- */}
+            <main className="flex-1 flex items-center justify-center p-8 relative overflow-hidden">
+                {/* Decorative Background Elements */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
+                    <div className="absolute -top-20 -right-20 w-96 h-96 bg-blue-200/50 rounded-full blur-3xl animate-blob"></div>
+                    <div className="absolute top-40 left-20 w-72 h-72 bg-purple-200/50 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
+                </div>
+
+                <div className="relative z-10 text-center max-w-lg mx-auto bg-white/60 backdrop-blur-xl p-12 rounded-3xl border border-white/50 shadow-2xl">
+                    <div className="inline-flex items-center justify-center w-20 h-20 mb-6 bg-zinc-900 text-white rounded-2xl shadow-lg rotate-3 transition-transform hover:rotate-6 hover:scale-105 cursor-default">
+                        <Hammer className="w-10 h-10" strokeWidth={1.5} />
+                    </div>
+
+                    <h1 className="text-3xl font-bold text-zinc-800 mb-3 tracking-tight">Раздел в разработке</h1>
+                    <p className="text-zinc-500 text-lg leading-relaxed mb-8">
+                        Мы работаем над чем-то особенным. <br />Конструктор скоро появится здесь, чтобы дать вам полную свободу творчества.
+                    </p>
+
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-full text-zinc-500 text-sm font-medium border border-zinc-200">
+                        <Construction className="w-4 h-4" />
+                        <span>Скоро</span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
+};

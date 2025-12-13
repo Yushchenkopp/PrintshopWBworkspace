@@ -166,18 +166,24 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
 
     const lastDateRef = useRef('05.09.2025');
 
+    // Calculate Structure Change (Render Phase)
+    // We compare current props/state with the previously committed refs.
+    // This allows us to pass 'true' to autoZoomOnResize specifically when structure changes.
+    const currentImagesJson = JSON.stringify(images.map(img => img.url));
+    const isStructureChanged =
+        currentImagesJson !== prevPropsRef.current.imagesJson ||
+        aspectRatio !== prevPropsRef.current.aspectRatio ||
+        headerLines !== prevPropsRef.current.headerLines ||
+        isBorderEnabled !== prevPropsRef.current.isBorderEnabled;
+
+    const shouldAutoZoom = !isReady || isStructureChanged;
+
     useEffect(() => {
         if (canvas) {
             const renderTemplate = async () => {
                 try {
-                    const currentImagesJson = JSON.stringify(images.map(img => img.url));
-
-                    const isStructureChanged =
-                        currentImagesJson !== prevPropsRef.current.imagesJson ||
-                        aspectRatio !== prevPropsRef.current.aspectRatio ||
-                        headerLines !== prevPropsRef.current.headerLines ||
-                        isSignatureEnabled !== prevPropsRef.current.isSignatureEnabled ||
-                        isBorderEnabled !== prevPropsRef.current.isBorderEnabled;
+                    // Access calculated values (re-calculate to be safe inside async or just use consts)
+                    // Note: accessing 'isStructureChanged' from closure is fine as this effect runs on render.
 
                     const isFilterChanged =
                         isBWEnabled !== prevPropsRef.current.isBWEnabled ||
@@ -185,9 +191,37 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
 
                     if (isStructureChanged || images.length === 0) { // Force render if empty to show placeholder
                         // Full Re-render
+
+                        // CAPTURE CURRENT POSITIONS (PRESERVE PAN)
+                        // Only if GRID Layout hasn't changed (Images & Aspect Ratio are same)
+                        // If Images or Ratio change, we MUST recalculate positions to fit new grid.
+                        const isGridChanged =
+                            currentImagesJson !== prevPropsRef.current.imagesJson ||
+                            aspectRatio !== prevPropsRef.current.aspectRatio ||
+                            headerLines !== prevPropsRef.current.headerLines;
+
+                        let manualPositions: { left: number, top: number }[] = [];
+
+                        if (!isGridChanged) {
+                            const currentObjects = canvas.getObjects().filter(o => o.type === 'image');
+                            manualPositions = currentObjects.map(obj => ({
+                                left: obj.left || 0,
+                                top: obj.top || 0
+                            }));
+                        }
+
                         const imageUrls = images.map(img => img.url);
-                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale);
-                        setLogicalCanvasHeight(newHeight);
+                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, manualPositions);
+
+                        if (newHeight !== logicalCanvasHeight) {
+                            setLogicalCanvasHeight(newHeight);
+                            // IMPORTANT: Do NOT update prevPropsRef yet.
+                            // We want 'isStructureChanged' to remain TRUE for the next render (Triggered by setLogicalCanvasHeight),
+                            // so that 'shouldAutoZoom' remains TRUE and CanvasEditor zooms to the new height.
+                            return;
+                        }
+
+                        setLogicalCanvasHeight(newHeight); // Redundant if equal, but safe.
 
                         // Reveal canvas after first render and layout adjustment
                         if (!isReady) {
@@ -197,8 +231,21 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         // Filter Update Only (No layout reset)
                         updateCollageFilters(canvas, isBWEnabled, brightness);
                     } else {
-                        // Smart Update (Text Only)
-                        updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, debouncedSignatureText, isSignatureEnabled, signatureScale);
+                        // Smart Update (Text Only + Signature)
+                        const newHeight = updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, debouncedSignatureText, isSignatureEnabled, signatureScale);
+                        // Update logical height if changed (e.g. signature added/removed)
+                        if (newHeight && newHeight !== logicalCanvasHeight) {
+                            setLogicalCanvasHeight(newHeight);
+                            // Similar here: if height changed, we might want to defer ref update? 
+                            // But for "Smart Update", we actually usually DON'T want auto-zoom.
+                            // 'isStructureChanged' is FALSE here. So 'shouldAutoZoom' is FALSE.
+                            // This is correct: stable/smart update should NOT zoom.
+                            // So we CAN return, but it doesn't affect zoom. 
+                            // However, if we return, we skip ref update, so 'isStructureChanged' logic holds.
+                            // But 'isStructureChanged' checks structural props, not signature.
+                            // So it's fine.
+                            return;
+                        }
                     }
 
                     // Update refs
@@ -219,7 +266,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale]);
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, logicalCanvasHeight]); // Added logicalCanvasHeight
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -528,7 +575,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     </button>
                 </div>
                 <div className={`flex-1 relative overflow-hidden transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
-                    <CanvasEditor onCanvasReady={handleCanvasReady} logicalHeight={logicalCanvasHeight}>
+                    <CanvasEditor onCanvasReady={handleCanvasReady} logicalHeight={logicalCanvasHeight} autoZoomOnResize={shouldAutoZoom}>
                         {images.length === 0 && (
                             <div
                                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}

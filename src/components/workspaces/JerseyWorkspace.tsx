@@ -232,7 +232,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
 
                 {/* CONTROLS */}
                 <section className="flex flex-col gap-4">
-                    <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">НАСТРОЙКИ</h2>
+
 
                     {/* Language Toggle */}
                     <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-2">
@@ -254,7 +254,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600 ml-1">Фамилия</label>
+
                         <input
                             type="text"
                             value={surname}
@@ -265,7 +265,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600 ml-1">Номер</label>
+
                         <input
                             type="text" // using text to allow 0 or special chars if needed, though usually numbers
                             value={number}
@@ -278,7 +278,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
 
                     {/* Color Picker */}
                     <div className="flex items-center gap-3 mb-2 pt-2">
-                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ЦВЕТ</span>
+
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setTextColor('#000000')}
@@ -296,7 +296,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         {/* Number Size Slider */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Размер номера</span>
+                                <span className="text-xs font-bold text-zinc-500 tracking-wide">Размер номера</span>
                                 <span className="text-[10px] font-medium text-zinc-400">{Math.round((numberSize / 1200) * 100)}%</span>
                             </div>
                             <input
@@ -313,7 +313,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         {/* Horizontal Position Slider */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Смещение X</span>
+                                <span className="text-xs font-bold text-zinc-500 tracking-wide">Смещение X</span>
                                 <span className="text-[10px] font-medium text-zinc-400">{horizontalOffset}</span>
                             </div>
                             <input
@@ -330,7 +330,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         {/* Vertical Position Slider */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Смещение Y</span>
+                                <span className="text-xs font-bold text-zinc-500 tracking-wide">Смещение Y</span>
                                 <span className="text-[10px] font-medium text-zinc-400">{verticalOffset}</span>
                             </div>
                             <input

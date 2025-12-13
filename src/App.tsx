@@ -4,6 +4,7 @@ import { PolaroidWorkspace } from './components/workspaces/PolaroidWorkspace';
 import { PapaWorkspace } from './components/workspaces/PapaWorkspace';
 import { JerseyWorkspace } from './components/workspaces/JerseyWorkspace';
 import { BabyWorkspace } from './components/workspaces/BabyWorkspace';
+import { ConstructorWorkspace } from './components/workspaces/ConstructorWorkspace';
 import { type TemplateType } from './utils/TemplateGenerators';
 
 function App() {
@@ -37,6 +38,10 @@ function App() {
 
       {template === 'baby' && (
         <BabyWorkspace onSwitchTemplate={handleSwitchTemplate} />
+      )}
+
+      {template === 'constructor' && (
+        <ConstructorWorkspace onSwitchTemplate={handleSwitchTemplate} />
       )}
     </div>
   );

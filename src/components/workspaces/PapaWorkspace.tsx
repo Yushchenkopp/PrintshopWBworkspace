@@ -66,36 +66,24 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
 
     // Track frame readiness
     const [isReady, setIsReady] = useState(false);
+    // Track structure version to trigger visual updates after async render
+    const [structureVersion, setStructureVersion] = useState(0);
 
     // Track previous structure to decide between Full Rebuild vs Quick Update
     const prevStructureRef = useRef<string>('');
 
-    // MAIN SYNC LOGIC
-    const syncCanvas = useCallback(async () => {
+    // MAIN STRUCTURE RENDER
+    const renderStructure = useCallback(async () => {
         if (!canvas) return;
 
-        const structureKey = `${templateMode}-${images.map(i => i?.id).join(',')}-${isBorderEnabled}`;
-        const hasObjects = canvas.getObjects().length > 0;
+        // Structure Key now only depends on layout essentials
+        const structureKey = `${templateMode}-${images.map(i => i?.id).join(',')}`;
 
-        // --- FAST PATH: Attributes Update Only (Brightness, B/W) ---
-        // If structure hasn't changed and we have content, just update visuals in-place.
-        // Including isBorderEnabled in the key means a border toggle will trigger a full rebuild,
-        // which is acceptable as it's a click, not a continuous drag like brightness.
-        if (structureKey === prevStructureRef.current && hasObjects) {
-            canvas.getObjects().forEach((obj: any) => {
-                if (obj.type === 'image') {
-                    const filters: any[] = [];
-                    if (isGrayscale) filters.push(new fabric.filters.Grayscale());
-                    if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness }));
-                    obj.filters = filters;
-                    obj.applyFilters();
-                }
-            });
-            canvas.requestRenderAll();
+        // Skip if structure hasn't changed (prevents re-render on re-mounts/minor triggers if key logic was broader)
+        if (structureKey === prevStructureRef.current) {
             return;
         }
 
-        // --- FULL PATH: Atomic Rebuild ---
         prevStructureRef.current = structureKey;
 
         // Visual Offset to center the heavy text
@@ -129,59 +117,17 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
         // If MAMA, scale to match PAPA height and center
         if (templateMode === 'MAMA') {
             adjScale = papaBounds.h / currentGroupBounds.h;
-            // New Dimensions
-            const newW = currentGroupBounds.w * adjScale;
-            // const newH = currentGroupBounds.h * adjScale; // Should match papaBounds.h
-
-            // Align Centers: 
-            // Target Center = papaBounds.cx, papaBounds.cy (relative to their own coord system? No, absolute).
-            // We want MAMA center to be at PAPA center.
-            // Current MAMA Center Scaled = currentGroupBounds.cx * adjScale? 
-            // Only if origin is 0,0. Yes paths have absolute coords.
-            // So:
-            // Target CX = papaBounds.cx
-            // Current Scaled CX = currentGroupBounds.cx * adjScale + (unknown shift?)
-            // dx = targetCX - (currentCX * scale)
-
             adjDx = papaBounds.cx - (currentGroupBounds.cx * adjScale);
             adjDy = papaBounds.cy - (currentGroupBounds.cy * adjScale);
         }
 
         // Prepare Promises for all slots
         const renderPromises = currentPaths.map((pathStr, i) => {
-            return new Promise<fabric.Object[]>((resolve) => { // Resolve with an array of fabric.Object
+            return new Promise<fabric.Object[]>((resolve) => {
                 const imgData = images[i];
 
                 // 1. Calculate Bounds with Adjustment
-                const tempPath = new fabric.Path(pathStr);
-
-                // Apply Adjustment to tempPath to get correct visual bounds
-                // Note: path commands are not scaled by .scale(), only the object transform.
-                // We must set scale/left/top on the object.
-                // But wait, if we use this tempPath to calculate bounds for image clipping, 
-                // we need the "Final" bounds.
-
-                tempPath.set({
-                    scaleX: adjScale,
-                    scaleY: adjScale,
-                    left: (tempPath.left || 0) * adjScale + adjDx, // This is tricky. fabric.Path from string likely has left=minX from path?
-                    // actually new fabric.Path(d) sets left/top to the bbox of the path.
-                    // If we want to transform the "Coordinate Space":
-                    // The path coordinates are absolute.
-                    // If we scale the object, we scale from origin (center or top/left).
-                });
-
-                // Let's use a group-like transform approach.
-                // Easier: Use the original path bounds, scale them manually, and apply offset.
                 const originalBounds = new fabric.Path(pathStr).getBoundingRect();
-
-                // The "Visual" bounds for this letter after adjustment:
-                // Width/Height scale simply.
-                // Left/Top: 
-                // The path's original visual Left is originalBounds.left.
-                // Scaled: originalBounds.left * adjScale.
-                // Shifted: + adjDx.
-                // BUT, relative to global startX/startY.
 
                 const finalLeft = (originalBounds.left * adjScale) + adjDx + startX;
                 const finalTop = (originalBounds.top * adjScale) + adjDy + startY;
@@ -194,7 +140,6 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                 if (imgData) {
                     fabric.Image.fromURL(imgData.url, { crossOrigin: 'anonymous' }).then((img) => {
                         // Create Clip Path
-                        // We must scale the clip path object to match!
                         const clipPath = new fabric.Path(pathStr, {
                             absolutePositioned: true,
                             originX: 'center',
@@ -204,25 +149,6 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                             left: centerX,
                             top: centerY
                         });
-
-                        // Wait, applying just scale/position to clips might not align if the path data has offsets?
-                        // fabric.Path(d) centers the path data around its origin? Yes.
-                        // So setting left/top to centerX/centerY works if origin is center.
-                        // And scaling works.
-                        // We need to ensure logic matches 'adjDx' logic.
-                        // adjDx was calculated to align the "Global Group Center".
-                        // Is (originalBounds.left * adjScale + adjDx) valid?
-                        // Yes, if we assume scale origin is (0,0).
-                        // Let's verify `clipPath` creation.
-                        // `new fabric.Path` auto-centers. 
-                        // If we position it at `centerX`, it should be correct.
-                        // Does `centerX` correctly represent the center of the scaled letter?
-                        // originalBounds.left is the left edge in "1.0" space.
-                        // * adjScale -> Left edge in scaled space.
-                        // + adjDx -> Left edge aligned to PAPA.
-                        // + startX -> Global canvas position.
-                        // + finalWidth/2 -> Center.
-                        // Yes, this seems correct.
 
                         // Image Setup
                         img.set({
@@ -238,12 +164,8 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                         const scale = Math.max(scaleX, scaleY);
                         img.scale(scale);
 
-                        // Filters
-                        const filters: any[] = [];
-                        if (isGrayscale) filters.push(new fabric.filters.Grayscale());
-                        if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness }));
-                        img.filters = filters;
-                        img.applyFilters();
+                        // Filters will be applied by separate effect
+                        img.filters = [];
 
                         // Apply Clip
                         img.clipPath = clipPath;
@@ -272,44 +194,45 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
 
                         const objectsToResolve: fabric.Object[] = [img];
 
-                        if (isBorderEnabled) {
-                            const borderObj = new fabric.Path(pathStr, {
-                                fill: 'transparent',
-                                stroke: 'black',
-                                strokeWidth: 9,
-                                selectable: false,
-                                evented: false,
-                                scaleX: adjScale,
-                                scaleY: adjScale,
-                                originX: 'center',
-                                originY: 'center',
-                                left: centerX, // Use Calculated Center
-                                top: centerY   // Use Calculated Center
-                            });
-                            objectsToResolve.push(borderObj);
-                        }
+                        // Border objects will be managed independently or we can add them initially but they might get out of sync?
+                        // Better to add them here as hidden/shown based on initial state?
+                        // Or logic: Objects are created; separate effect toggles them.
+                        // Let's create border object ALWAYS but toggle visibility.
+
+                        const borderObj = new fabric.Path(pathStr, {
+                            fill: 'transparent',
+                            stroke: 'black',
+                            strokeWidth: 9,
+                            selectable: false,
+                            evented: false,
+                            scaleX: adjScale,
+                            scaleY: adjScale,
+                            originX: 'center',
+                            originY: 'center',
+                            left: centerX,
+                            top: centerY,
+                            visible: false, // Default hidden, separate effect enables it
+                            data: { type: 'border', index: i }
+                        } as any);
+                        objectsToResolve.push(borderObj);
+
                         resolve(objectsToResolve);
                     });
                 } else {
                     // Placeholder Logic
                     const bgObj = new fabric.Path(pathStr, {
                         fill: '#f9f9fc',
-                        stroke: isBorderEnabled ? 'black' : '#e4e4e7',
+                        stroke: '#e4e4e7', // Initial stroke
                         strokeWidth: 9,
                         selectable: false,
                         objectCaching: false,
                         shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.1)', blur: 30, offsetX: 0, offsetY: 20 }),
                         originX: 'center',
                         originY: 'center',
-                        // We DO NOT set left/top here because it's in a group?
-                        // Wait, in previous code: left: 0, top: 0. 
-                        // Then group positioned at groupLeft/Top.
                         scaleX: adjScale,
                         scaleY: adjScale
                     });
 
-                    // Group Position
-                    // Must be the Calculated Center
                     const groupLeft = centerX;
                     const groupTop = centerY;
 
@@ -321,14 +244,17 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
 
                     // Add Events
                     group.on('mouseover', () => {
-                        bgObj.set({ fill: '#ffffff', stroke: isBorderEnabled ? 'black' : '#d4d4d8' });
-                        bgObj.set({ shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.2)', blur: 60, offsetX: 0, offsetY: 30 }) });
+                        // Dynamic access to state? No, 'isBorderEnabled' from closure is stale.
+                        // We need to check canvas state or use a ref if we want dynamic behavior inside event.
+                        // BUT, for placeholder, stroke color is simpler. 
+                        // Let's just set generic hover color. 
+                        // The actual render logic controls 'base' stroke.
+                        bgObj.set({ fill: '#ffffff', shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.2)', blur: 60, offsetX: 0, offsetY: 30 }) });
                         group.animate({ scaleX: 1.035, scaleY: 1.035 }, { duration: 300, onChange: canvas.requestRenderAll.bind(canvas), easing: fabric.util.ease.easeOutQuad });
                         canvas.requestRenderAll();
                     });
                     group.on('mouseout', () => {
-                        bgObj.set({ fill: '#f9f9fc', stroke: isBorderEnabled ? 'black' : '#e4e4e7' });
-                        bgObj.set({ shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.1)', blur: 30, offsetX: 0, offsetY: 20 }) });
+                        bgObj.set({ fill: '#f9f9fc', shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.1)', blur: 30, offsetX: 0, offsetY: 20 }) });
                         group.animate({ scaleX: 1, scaleY: 1 }, { duration: 300, onChange: canvas.requestRenderAll.bind(canvas), easing: fabric.util.ease.easeOutQuad });
                         canvas.requestRenderAll();
                     });
@@ -345,7 +271,6 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
         canvas.clear();
         canvas.backgroundColor = '';
 
-        // Flatten results (fabric.Object[][]) -> fabric.Object[]
         const flatObjects = results.flat();
 
         flatObjects.forEach(obj => {
@@ -355,22 +280,78 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
             }
         });
 
+        // Force update of visuals immediately after render
+        // But effects run in order.
+        // We can just call requestRenderAll here.
         canvas.requestRenderAll();
 
-        // Reveal with fade-in on first load
+        // Notify effects that structure is ready
+        setStructureVersion(v => v + 1);
+
         if (!isReady) {
             setTimeout(() => setIsReady(true), 50);
         }
 
-    }, [canvas, images, isGrayscale, brightness, isBorderEnabled, templateMode, isReady]);
+    }, [canvas, images, templateMode, isReady]); // Removed visuals
 
+    // --- EFFECT: RENDER STRUCTURE ---
     useEffect(() => {
-        // Defer heavy canvas rendering to next frame to allow UI (Toggle) to update smoothly first
         const rAF = requestAnimationFrame(() => {
-            syncCanvas();
+            renderStructure();
         });
         return () => cancelAnimationFrame(rAF);
-    }, [syncCanvas]);
+    }, [renderStructure]); // Dependencies are in useCallback
+
+    // --- EFFECT: SMART VISUALS (Brightness / Grayscale) ---
+    useEffect(() => {
+        if (!canvas) return;
+        const objects = canvas.getObjects();
+        let changed = false;
+
+        objects.forEach((obj: any) => {
+            if (obj.data?.type === 'image' && obj.type === 'image') {
+                // Update filters
+                const filters: any[] = [];
+                if (isGrayscale) filters.push(new fabric.filters.Grayscale());
+                if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness }));
+
+                // Check if actually changed to avoid redundant apply
+                // Fabric filters comparison is hard, just re-apply.
+                obj.filters = filters;
+                obj.applyFilters();
+                changed = true;
+            }
+        });
+
+        if (changed) canvas.requestRenderAll();
+    }, [canvas, brightness, isGrayscale, structureVersion]);
+
+
+    // --- EFFECT: SMART BORDER ---
+    useEffect(() => {
+        if (!canvas) return;
+        const objects = canvas.getObjects();
+        let changed = false;
+
+        objects.forEach((obj: any) => {
+            // For Images: Border is a separate path object with data.type = 'border'
+            if (obj.data?.type === 'border') {
+                obj.visible = isBorderEnabled;
+                changed = true;
+            }
+            // For Placeholders: Border is the stroke of the path inside the group
+            if (obj.data?.type === 'placeholder') {
+                // Placeholder is a Group containing a Path
+                const pathObj = (obj as fabric.Group).getObjects()[0]; // Assuming 1st object
+                if (pathObj) {
+                    pathObj.set({ stroke: isBorderEnabled ? 'black' : '#e4e4e7' });
+                    changed = true;
+                }
+            }
+        });
+        if (changed) canvas.requestRenderAll();
+    }, [canvas, isBorderEnabled, images, structureVersion]); // Images dep needed? If images change, structure rebuilds, then this effect runs? 
+    // Yes, renderStructure rebuilds -> React commits -> this effect runs -> ensures borders match state.
 
     // HANDLERS
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetIndex?: number) => {

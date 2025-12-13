@@ -49,6 +49,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
 
     const [scaleX, setScaleX] = useState<number>(1);
     const [scaleY, setScaleY] = useState<number>(1);
+    const [signatureScale, setSignatureScale] = useState<number>(1);
 
     // Listen for selection changes to update zoom slider
     useEffect(() => {
@@ -183,25 +184,30 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
         isBorderEnabled: false,
         isFooterEnabled: false,
         scaleX: 1,
-        scaleY: 1
+        scaleY: 1,
+        signatureScale: 1,
+        textColor: '#000000'
     });
 
     const lastDateRef = useRef('05.09.2025');
+
+    // Calculate Structure Change (Render Phase)
+    const currentImagesJson = JSON.stringify(images.map(img => img.url));
+    const isStructureChanged =
+        currentImagesJson !== prevPropsRef.current.imagesJson ||
+        aspectRatio !== prevPropsRef.current.aspectRatio ||
+        headerLines !== prevPropsRef.current.headerLines ||
+        isFooterEnabled !== prevPropsRef.current.isFooterEnabled ||
+        isBorderEnabled !== prevPropsRef.current.isBorderEnabled ||
+        textColor !== prevPropsRef.current.textColor; // Force re-render on color change
+
+    const shouldAutoZoom = !isReady || isStructureChanged;
 
     useEffect(() => {
         if (canvas) {
             const renderTemplate = async () => {
                 try {
-                    const currentImagesJson = JSON.stringify(images.map(img => img.url));
-
-                    const isStructureChanged =
-                        currentImagesJson !== prevPropsRef.current.imagesJson ||
-                        aspectRatio !== prevPropsRef.current.aspectRatio ||
-                        headerLines !== prevPropsRef.current.headerLines ||
-                        isSignatureEnabled !== prevPropsRef.current.isSignatureEnabled ||
-                        isBorderEnabled !== prevPropsRef.current.isBorderEnabled ||
-                        isFooterEnabled !== prevPropsRef.current.isFooterEnabled;
-
+                    // Access calculated values
                     const isGeometryChanged =
                         scaleX !== prevPropsRef.current.scaleX ||
                         scaleY !== prevPropsRef.current.scaleY;
@@ -209,6 +215,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                     const isFilterChanged =
                         isBWEnabled !== prevPropsRef.current.isBWEnabled ||
                         brightness !== prevPropsRef.current.brightness;
+
 
                     if (isStructureChanged) {
                         // Full Re-render (Structure changed)
@@ -220,10 +227,35 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                             }
                         }
 
+                        // CAPTURE CURRENT POSITIONS (PRESERVE PAN)
+                        // Only capture if Grid/Layout hasn't changed.
+                        // If Header Lines, Ratio, or Images change, we must reset positions to fit new layout.
+                        const isLayoutChanged =
+                            currentImagesJson !== prevPropsRef.current.imagesJson ||
+                            aspectRatio !== prevPropsRef.current.aspectRatio ||
+                            headerLines !== prevPropsRef.current.headerLines;
+
+                        let manualPositions: { left: number, top: number }[] = [];
+
+                        if (!isLayoutChanged) {
+                            const currentObjects = canvas.getObjects().filter(o => o.type === 'image');
+                            manualPositions = currentObjects.map(obj => ({
+                                left: obj.left || 0,
+                                top: obj.top || 0
+                            }));
+                        }
+
                         const imageUrls = images.map(img => img.url);
                         // Pass initial scale/pan to generate (though often reset on structure change, 
                         // preserving them gives better UX if just toggling footer)
-                        const newHeight = await generateBabyTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, scaleX, scaleY);
+                        const newHeight = await generateBabyTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, scaleX, scaleY, signatureScale, manualPositions);
+
+                        if (newHeight !== logicalCanvasHeight) {
+                            setLogicalCanvasHeight(newHeight);
+                            // Defer ref update so next render sees structure change and auto-zooms
+                            return;
+                        }
+
                         setLogicalCanvasHeight(newHeight);
                         // Force Geometry Update to sync Border/Clip immediately (Fixes Scenario B Mismatch)
                         updateImageGeometry(canvas, scaleX, scaleY);
@@ -240,8 +272,14 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                         // Filter Update Only
                         updateCollageFilters(canvas, isBWEnabled, brightness);
                     } else {
-                        // Smart Update (Text Only)
-                        updateBabyHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled, scaleX);
+                        // Smart Update (Text Only + Signature)
+                        const newHeight = updateBabyHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled, scaleX, signatureScale);
+                        // Update logical height if changed (e.g. signature added/removed or resized)
+                        if (newHeight && newHeight !== logicalCanvasHeight) {
+                            setLogicalCanvasHeight(newHeight);
+                            // Smart updates (like signature resize) should NOT trigger auto-zoom
+                            return;
+                        }
                     }
 
                     // Update refs
@@ -256,7 +294,9 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                         isBorderEnabled,
                         isFooterEnabled,
                         scaleX,
-                        scaleY
+                        scaleY,
+                        signatureScale,
+                        textColor
                     };
                 } catch (error) {
                     console.error("Error rendering template:", error);
@@ -264,7 +304,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, scaleX, scaleY]);
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, scaleX, scaleY, signatureScale, logicalCanvasHeight]); // Added logicalCanvasHeight
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -389,10 +429,21 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                         </div>
                     </div>
 
+                    {/* Translit Toggle (Moved here) */}
+                    <div className="flex items-center gap-2 mb-4 pl-1">
+                        <span className="text-xs font-bold text-zinc-500 tracking-wide w-[60px]">Транслит</span>
+                        <button
+                            onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
+                            className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                        >
+                            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                        </button>
+                    </div>
+
 
                     {/* Footer Toggle (Baby Only) */}
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ФУТЕР</span>
+                    <div className="flex items-center gap-2 mb-2 pl-1">
+                        <span className="text-xs font-bold text-zinc-500 tracking-wide w-[60px]">Подвал</span>
                         <button
                             onClick={() => setIsFooterEnabled(!isFooterEnabled)}
                             className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isFooterEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
@@ -401,16 +452,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                         </button>
                     </div>
 
-                    {/* Translit Toggle (Always Visible) */}
-                    <div className="flex items-center justify-between mb-4 px-1">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">ТРАНСЛИТ</span>
-                        <button
-                            onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
-                            className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                        >
-                            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                        </button>
-                    </div>
+
 
                     {isFooterEnabled && (
                         <>
@@ -439,9 +481,9 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                             </div>
 
                             {/* Settings Row: Since + Translit */}
-                            <div className="flex items-center gap-4 mb-3 px-1">
+                            <div className="flex items-center gap-4 mb-3 pl-1">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">SINCE</span>
+                                    <span className="text-xs font-bold text-zinc-500 tracking-wide w-[60px]">Since</span>
                                     <button
                                         onClick={() => {
                                             const newValue = !isSinceEnabled;
@@ -470,24 +512,32 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                                         + подпись
                                     </button>
                                 ) : (
-                                    <div className="relative mt-2">
+                                    <div className="flex gap-2 mt-2 h-[72px]">
                                         <textarea
                                             value={signatureText}
                                             onChange={(e) => handleTextChange(setSignatureText, e.target.value)}
-                                            className="w-full px-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 resize-none"
+                                            className="flex-1 px-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 resize-none h-full"
                                             placeholder="WANNA BE YOURS"
-                                            rows={3}
-                                            style={{ minHeight: '60px' }}
                                         />
+                                        <div className="w-8 flex items-center justify-center relative">
+                                            <input
+                                                type="range"
+                                                min="0.5"
+                                                max="2.0"
+                                                step="0.1"
+                                                value={signatureScale}
+                                                onChange={(e) => setSignatureScale(parseFloat(e.target.value))}
+                                                className="absolute w-[72px] h-2 -rotate-90 origin-center cursor-pointer appearance-none bg-zinc-200 rounded-lg [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 transition-all hover:[&::-webkit-slider-thumb]:scale-110"
+                                            />
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         </>
                     )}
 
-                    <div className="flex items-center justify-between mb-2 mt-4">
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">ЦВЕТ</span>
+                    <div className="flex items-center justify-between mb-2 mt-4 pl-1">
+                        <div className="flex items-center">
                             <div className="flex items-center">
                                 <div className="flex gap-2">
                                     <button
@@ -532,9 +582,9 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                     </div>
 
                     <div className="mt-6">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-2 pl-1">
                             <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-1">
+                                <span className="text-xs font-bold text-zinc-500 tracking-wide flex items-center gap-1">
                                     <Sun className="w-3 h-3" /> Яркость
                                 </span>
                                 <span className="text-[10px] font-medium text-zinc-400">{(brightness * 100).toFixed(0)}%</span>
@@ -570,7 +620,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                     </button>
                 </div>
                 <div className={`flex-1 relative overflow-hidden transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
-                    <CanvasEditor onCanvasReady={handleCanvasReady} logicalHeight={logicalCanvasHeight}>
+                    <CanvasEditor onCanvasReady={handleCanvasReady} logicalHeight={logicalCanvasHeight} autoZoomOnResize={shouldAutoZoom}>
                         {images.length === 0 && (
                             <div
                                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}

@@ -32,6 +32,12 @@ interface PolaroidWorkspaceProps {
 // We will load the image and center it.
 const TEMPLATE_URL = '/templates/polaroids-bg.png';
 
+// Calibrated slots coordinates
+const SLOTS = [
+    { x: 18, y: 22, w: 534, h: 477 },
+    { x: 652, y: 24, w: 533, h: 472 }
+];
+
 export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [parent] = useAutoAnimate();
@@ -39,11 +45,6 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
     const [images, setImages] = useState<({ id: string; url: string } | null)[]>([null, null]);
     const [isReady, setIsReady] = useState(false);
     const templateRef = React.useRef<fabric.Image | null>(null);
-    // Calibrated slots coordinates
-    const slots = [
-        { x: 18, y: 22, w: 534, h: 477 },
-        { x: 652, y: 24, w: 533, h: 472 }
-    ];
 
     const [textVariant, setTextVariant] = useState<'wife' | 'husband'>('wife');
     const [brightness, setBrightness] = useState<number>(0);
@@ -197,7 +198,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
                 // 1. Prepare Images & Placeholders
                 for (let i = 0; i < 2; i++) {
-                    const slot = slots[i];
+                    const slot = SLOTS[i];
                     // Adjust for scale (slots are already in canvas coords now)
                     const slotX = slot.x + OFFSET_X;
                     const slotY = slot.y + OFFSET_Y;
@@ -369,7 +370,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 ];
 
                 for (let i = 0; i < 2; i++) {
-                    const slot = slots[i];
+                    const slot = SLOTS[i];
                     // Adjust for scale and offset
                     const slotX = slot.x + OFFSET_X;
                     const slotY = slot.y + OFFSET_Y;
@@ -423,8 +424,6 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                     // The initial position is calculated correctly above.
 
                     topLayer.push(text);
-
-                    topLayer.push(text);
                 }
 
                 // --- SYNCHRONOUS SWAP ---
@@ -468,7 +467,6 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 canvas.requestRenderAll();
 
                 if (!isReady) setIsReady(true);
-
             } catch (err) {
                 console.error("Error loading template", err);
             }
@@ -476,7 +474,62 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
         renderPolaroid();
 
-    }, [canvas, images, slots, textVariant, brightness]); // Added brightness to deps
+    }, [canvas, images]); // Removed textVariant and brightness to prevent re-render
+
+    // --- SMART UPDATE: TEXT VARIANT ---
+    useEffect(() => {
+        if (!canvas) return;
+        const textDefaults = [
+            textVariant === 'wife'
+                ? "Интересно, когда я вырасту,\nкто будет моей женой?"
+                : "Интересно, когда я вырасту,\nкто будет моим мужем?",
+            "Я буду!"
+        ];
+
+        // Find and update text objects
+        // We identify them by type 'text'.
+        const textObjects = canvas.getObjects().filter(obj => obj.type === 'text') as fabric.Text[];
+
+        // Sort by X position to guarantee Order: [Left, Right]
+        // This prevents "Я буду" from ending up on the left if stacking order is somehow flipped.
+        textObjects.sort((a, b) => (a.left || 0) - (b.left || 0));
+
+        if (textObjects.length >= 2) {
+            // Update First Text (Left)
+            if (textObjects[0].text !== textDefaults[0]) {
+                textObjects[0].set({ text: textDefaults[0] });
+            }
+            // Update Second Text (Right)
+            if (textObjects[1].text !== textDefaults[1]) {
+                textObjects[1].set({ text: textDefaults[1] });
+            }
+            canvas.requestRenderAll();
+        }
+
+    }, [canvas, textVariant]);
+
+    // --- SMART UPDATE: BRIGHTNESS ---
+    useEffect(() => {
+        if (!canvas) return;
+        // Find actual images (not placeholders)
+        // Images are in bottomLayer, type 'image' (if we added them as fabric.Image)
+        // We specifically added them as fabric.Image from URL.
+        const imageObjects = canvas.getObjects().filter(obj => obj.type === 'image' && obj !== templateRef.current) as fabric.Image[];
+
+        imageObjects.forEach(img => {
+            // Apply Brightness Filter
+            // Note: In Fabric, we replace the filter array or update it.
+            // Since we only have one filter (Brightness), replacement is safe/fast.
+            if (brightness !== 0) {
+                img.filters = [new fabric.filters.Brightness({ brightness: brightness })];
+            } else {
+                img.filters = [];
+            }
+            img.applyFilters();
+        });
+        canvas.requestRenderAll();
+
+    }, [canvas, brightness]);
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>

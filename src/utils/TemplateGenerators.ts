@@ -103,7 +103,8 @@ export const generateCollageTemplate = async (
     signatureTextValue: string = 'WANNA BE YOURS', // New
     isSignatureEnabled: boolean = false, // New
     isBorderEnabled: boolean = false, // New Border logic
-    signatureScale: number = 1 // New Scale
+    signatureScale: number = 1, // New Scale,
+    manualPositions: { left: number, top: number }[] = [] // New: Preserve Dragged Positions
 ): Promise<number> => {
     if (!canvas) return 800;
 
@@ -288,6 +289,15 @@ export const generateCollageTemplate = async (
                 const left = colLeft + (colWidth / 2);
                 const top = gridTop + BORDER_WIDTH + (row * photoHeight) + (photoHeight / 2);
 
+                // Override Position if Manual Data Exists (Preserve Pan)
+                let finalLeft = left;
+                let finalTop = top;
+
+                if (manualPositions && manualPositions[imageIndex]) {
+                    finalLeft = manualPositions[imageIndex].left;
+                    finalTop = manualPositions[imageIndex].top;
+                }
+
                 // DUAL LOGIC: Strip Gaps vs Strict Border
                 // REVISED: Always use OVERLAP = 2 to close internal gaps.
                 // The Composite Border (drawn on top) will mask the outer edges.
@@ -304,8 +314,8 @@ export const generateCollageTemplate = async (
                 const clipH = photoHeight + OVERLAP;
 
                 img.set({
-                    left: left,
-                    top: top,
+                    left: finalLeft,
+                    top: finalTop,
                     originX: 'center',
                     originY: 'center',
                     scaleX: scale,
@@ -560,73 +570,100 @@ export const updateCollageHeader = (
 
     // 2. UPDATE FOOTER NAME
     const footerName = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
-    let nameHeight = 0;
+    if (!footerTextValue) {
+        footerName.set({ text: '', visible: false, height: 0 }); // Hide
+    } else {
+        // If previously hidden, we might need to reset visibility
+        footerName.set({ visible: true });
 
-    if (footerName) {
-        footerName.set({ fill: textColor });
+        if (footerName.text !== footerTextValue) { // Only update if changed
+            footerName.set({ text: footerTextValue });
 
-        // Visibility Logic
-        if (!footerTextValue) {
-            footerName.set({ text: '', visible: false, height: 0 }); // Hide
-            nameHeight = 0;
-        } else {
-            // If previously hidden, we might need to reset visibility
-            footerName.set({ visible: true });
+            // Reset scale to 1 before checking width
+            footerName.set({ scaleX: 1, scaleY: 1 });
 
-            if (footerName.text !== footerTextValue) { // Only update if changed
-                footerName.set({ text: footerTextValue });
-
-                // Reset scale to 1 before checking width
-                footerName.set({ scaleX: 1, scaleY: 1 });
-
-                // Auto-scale Name (max 55% width)
-                const maxNameWidth = CONTENT_WIDTH * 0.55;
-                if (footerName.width! > maxNameWidth) {
-                    const scale = maxNameWidth / footerName.width!;
-                    footerName.set({ scaleX: scale, scaleY: scale });
-                }
+            // Auto-scale Name (max 55% width)
+            const maxNameWidth = CONTENT_WIDTH * 0.55;
+            if (footerName.width! > maxNameWidth) {
+                const scale = maxNameWidth / footerName.width!;
+                footerName.set({ scaleX: scale, scaleY: scale });
             }
-            nameHeight = footerName.height! * footerName.scaleY!;
         }
     }
 
-    // 3. UPDATE SIGNATURE
-    // Since signature structure might change (add/remove), we need to handle this.
-    // If we receive "enabled" and no object exists -> we should probably re-render full template or create it here.
-    // For simplicity, if signature state toggles, the Workspace should trigger FULL re-render (generateCollageTemplate).
-    // This function assumes objects exist or we just update text/color.
 
+    // 3. UPDATE SIGNATURE
     const signature = canvas.getObjects().find((obj: any) => obj.name === 'footer-signature');
 
-    if (isSignatureEnabled && signature) {
-        // Apply Scale to existing object if needed, or re-render text
-        // Textbox fontSize update:
+    if (isSignatureEnabled) {
         const baseFontSize = 28 * SCALE_FACTOR;
-        signature.set({
-            text: signatureTextValue,
-            fill: textColor,
-            visible: true,
-            fontSize: baseFontSize * signatureScale
-        });
+        const signatureWidth = CONTENT_WIDTH * 0.5;
 
-        // Update Position based on Name
-        const footerTop = footerName ? footerName.top : 0; // Fallback
+        // Position: 
+        // If Name is visible: beneath Name
+        // If Name is hidden: at Name's position + OFFSET
+
+        // Find Footer Name Position
+        const footerNameObj = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
+
+        // Use existing top or fallback if not found
+        // If we are in this function, basic layout exists.
+        // footerNameObj should exist if template was generated.
+
+        // Fallback calculation if objects missing (safety)
+        const gridBottomEstimate = canvas.height - (100 * SCALE_FACTOR);
+        const footerTop = footerNameObj ? footerNameObj.top : gridBottomEstimate;
+
+        const nameH = (footerNameObj && footerNameObj.visible) ? (footerNameObj.height! * footerNameObj.scaleY!) : 0;
 
         let signatureTop = footerTop;
-        if (footerTextValue && footerName && footerName.visible) {
-            signatureTop += nameHeight + (5 * SCALE_FACTOR);
+        if (footerTextValue && footerNameObj && footerNameObj.visible) {
+            // Add margin below name
+            signatureTop += nameH + (5 * SCALE_FACTOR);
         } else {
-            signatureTop += (10 * SCALE_FACTOR); // "A bit higher" (10px) when name is empty
+            // Name hidden -> Signature takes similar vertical spot (slightly offset)
+            signatureTop += (10 * SCALE_FACTOR);
         }
-        signature.set({ top: signatureTop });
 
+        if (signature) {
+            // Update Existing
+            signature.set({
+                text: signatureTextValue,
+                fill: textColor,
+                visible: true,
+                fontSize: baseFontSize * signatureScale,
+                top: signatureTop,
+                left: FULL_WIDTH - PADDING_SIDE
+            });
+        } else {
+            // Create New
+            const newSignature = new fabric.Textbox(signatureTextValue, {
+                width: signatureWidth,
+                fontFamily: 'Arial',
+                fontWeight: 'bold',
+                fontSize: baseFontSize * signatureScale,
+                fill: textColor,
+                textAlign: 'right',
+                originX: 'right',
+                originY: 'top',
+                left: FULL_WIDTH - PADDING_SIDE,
+                top: signatureTop,
+                splitByGrapheme: false,
+                selectable: false,
+                evented: false,
+                name: 'footer-signature'
+            });
+            canvas.add(newSignature);
+        }
     } else if (!isSignatureEnabled && signature) {
+        // Hide if disabled
         signature.set({ visible: false });
     }
 
-
     // 4. UPDATE FOOTER DATE
     const footerDate = canvas.getObjects().find((obj: any) => obj.name === 'footer-date');
+    let dateTop = 0;
+
     if (footerDate) {
         const dateString = isSince ? `since ${footerDateValue}` : footerDateValue;
         footerDate.set({ text: dateString, fill: textColor });
@@ -639,6 +676,7 @@ export const updateCollageHeader = (
             const scale = targetDateWidth / footerDate.width;
             footerDate.set({ scaleX: scale, scaleY: scale });
         }
+        dateTop = footerDate.top!;
     }
 
     // 5. UPDATE BARCODE COLOR
@@ -649,9 +687,27 @@ export const updateCollageHeader = (
         });
     }
 
-    canvas.requestRenderAll();
-};
+    // 6. RECALCULATE HEIGHT
+    // Calculate total height to include dynamic elements
+    let totalHeight = dateTop + (30 * SCALE_FACTOR) + (40 * SCALE_FACTOR); // Base height from Date (approx)
 
+    // Better: Find date bottom
+    if (footerDate) {
+        totalHeight = footerDate.top! + (footerDate.height! * footerDate.scaleY!) + (40 * SCALE_FACTOR);
+    }
+
+    // Check if signature extends lower
+    if (isSignatureEnabled) {
+        const sig = canvas.getObjects().find((o: any) => o.name === 'footer-signature');
+        if (sig && sig.visible) {
+            const sigBottom = sig.top! + sig.height! + (40 * SCALE_FACTOR);
+            if (sigBottom > totalHeight) totalHeight = sigBottom;
+        }
+    }
+
+    canvas.requestRenderAll();
+    return totalHeight;
+};
 
 // --- BABY TEMPLATE (Otchestvo) ---
 // Cloned and modified for font logic: 1 line -> Bebasneue, >1 lines -> Arial Black
@@ -672,7 +728,9 @@ export const generateBabyTemplate = async (
     isBorderEnabled: boolean = false,
     isFooterEnabled: boolean = false, // New
     cropScaleX: number = 1,
-    cropScaleY: number = 1
+    cropScaleY: number = 1,
+    signatureScale: number = 1, // New Scale,
+    manualPositions: { left: number, top: number }[] = [] // New: Preserve Dragged Positions
 ): Promise<number> => {
     if (!canvas) return 800;
 
@@ -866,12 +924,22 @@ export const generateBabyTemplate = async (
                 (img as any).baseClipHeight = clipH;
                 (img as any).baseClipWidth = clipW;
                 (img as any).baseClipHeight = clipH;
+                (img as any).baseClipHeight = clipH;
                 (img as any).baseCellTop = cellTop; // Fixed top edge anchor
                 (img as any).baseLeft = left; // Fixed horizontal center anchor
 
+                // Override Position if Manual Data Exists
+                let finalLeft = left;
+                let finalTop = top;
+
+                if (manualPositions && manualPositions[imageIndex]) {
+                    finalLeft = manualPositions[imageIndex].left;
+                    finalTop = manualPositions[imageIndex].top;
+                }
+
                 img.set({
-                    left: left,
-                    top: top,
+                    left: finalLeft,
+                    top: finalTop,
                     originX: 'center',
                     originY: 'center',
                     scaleX: scale,
@@ -1045,7 +1113,7 @@ export const generateBabyTemplate = async (
             width: signatureWidth,
             fontFamily: 'Arial',
             fontWeight: 'bold',
-            fontSize: signatureFontSize,
+            fontSize: signatureFontSize * signatureScale,
             fill: textColor,
             textAlign: 'right',
             originX: 'right',
@@ -1148,7 +1216,8 @@ export const updateBabyHeader = (
     headerLines: number,
     signatureTextValue: string,
     isSignatureEnabled: boolean,
-    cropScaleX: number = 1
+    cropScaleX: number = 1,
+    signatureScale: number = 1 // New Scale
 ) => {
     if (!canvas) return;
 
@@ -1204,12 +1273,10 @@ export const updateBabyHeader = (
 
     // 2. UPDATE FOOTER NAME (Same as Collage)
     const footerName = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
-    let nameHeight = 0;
     if (footerName) {
         footerName.set({ fill: textColor });
         if (!footerTextValue) {
             footerName.set({ text: '', visible: false, height: 0 });
-            nameHeight = 0;
         } else {
             footerName.set({ visible: true });
             if (footerName.text !== footerTextValue) {
@@ -1221,29 +1288,77 @@ export const updateBabyHeader = (
                     footerName.set({ scaleX: scale, scaleY: scale });
                 }
             }
-            nameHeight = footerName.height! * footerName.scaleY!;
         }
     }
 
     // 3. UPDATE SIGNATURE
     const signature = canvas.getObjects().find((obj: any) => obj.name === 'footer-signature');
-    if (isSignatureEnabled && signature) {
-        signature.set({ text: signatureTextValue, fill: textColor, visible: true });
-        // Update Position
-        const footerTop = footerName ? footerName.top : 0;
+
+    if (isSignatureEnabled) {
+        const baseFontSize = 28 * SCALE_FACTOR;
+        const signatureWidth = CONTENT_WIDTH * 0.5;
+
+        // Position Calculation
+        // Position:
+        // If Name is visible: beneath Name
+        // If Name is hidden: at Name's position + OFFSET
+        // Recalculate these based on current state
+
+        // Find Grid Bottom (Estimate based on content?)
+        // Better: Find footer-name top - margin
+        // Or finding existing barcode/name top.
+        const footerNameObj = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
+        const footerTop = footerNameObj ? footerNameObj.top : (canvas.height - 100); // Fallback
+
+        // Name Height
+        const nameH = (footerNameObj && footerNameObj.visible) ? (footerNameObj.height! * footerNameObj.scaleY!) : 0;
+
         let signatureTop = footerTop;
-        if (footerTextValue && footerName && footerName.visible) {
-            signatureTop += nameHeight + (5 * SCALE_FACTOR);
+        if (footerTextValue && footerNameObj && footerNameObj.visible) {
+            signatureTop += nameH + (5 * SCALE_FACTOR);
         } else {
             signatureTop += (10 * SCALE_FACTOR);
         }
-        signature.set({ top: signatureTop });
+
+        if (signature) {
+            // Update Existing
+            signature.set({
+                text: signatureTextValue,
+                fill: textColor,
+                visible: true,
+                fontSize: baseFontSize * signatureScale,
+                top: signatureTop,
+                left: FULL_WIDTH - PADDING_SIDE
+            });
+        } else {
+            // Create New
+            const newSignature = new fabric.Textbox(signatureTextValue, {
+                width: signatureWidth,
+                fontFamily: 'Arial',
+                fontWeight: 'bold',
+                fontSize: baseFontSize * signatureScale,
+                fill: textColor,
+                textAlign: 'right',
+                originX: 'right',
+                originY: 'top',
+                left: FULL_WIDTH - PADDING_SIDE,
+                top: signatureTop,
+                splitByGrapheme: false,
+                selectable: false,
+                evented: false,
+                name: 'footer-signature'
+            });
+            canvas.add(newSignature);
+        }
+
     } else if (!isSignatureEnabled && signature) {
         signature.set({ visible: false });
     }
 
+
     // 4. UPDATE DATE
     const footerDate = canvas.getObjects().find((obj: any) => obj.name === 'footer-date');
+    let dateTop = 0;
     if (footerDate) {
         const dateString = isSince ? `since ${footerDateValue}` : footerDateValue;
         footerDate.set({ text: dateString, fill: textColor });
@@ -1263,7 +1378,26 @@ export const updateBabyHeader = (
         });
     }
 
+    // 6. RECALCULATE HEIGHT
+    // Calculate total height to include dynamic elements
+    let totalHeight = dateTop + (30 * SCALE_FACTOR) + (40 * SCALE_FACTOR); // Base height from Date (approx)
+
+    // Better: Find date bottom
+    if (footerDate) {
+        totalHeight = footerDate.top! + (footerDate.height! * footerDate.scaleY!) + (40 * SCALE_FACTOR);
+    }
+
+    // Check if signature extends lower
+    if (isSignatureEnabled) {
+        const sig = canvas.getObjects().find((o: any) => o.name === 'footer-signature');
+        if (sig && sig.visible) {
+            const sigBottom = sig.top! + sig.height! + (40 * SCALE_FACTOR);
+            if (sigBottom > totalHeight) totalHeight = sigBottom;
+        }
+    }
+
     canvas.requestRenderAll();
+    return totalHeight;
 };
 
 export const updateCollageFilters = (

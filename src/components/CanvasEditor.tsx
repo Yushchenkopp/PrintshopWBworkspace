@@ -6,10 +6,11 @@ interface CanvasEditorProps {
     logicalHeight?: number; // Optional prop to control logical height
     logicalWidth?: number; // Optional prop to control logical width
     padding?: number; // Optional padding override
+    autoZoomOnResize?: boolean; // Optional: Disable auto-fit on subsequent resizing
     children?: React.ReactNode;
 }
 
-export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logicalHeight = 800, logicalWidth = 2400, padding, children }) => {
+export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logicalHeight = 800, logicalWidth = 2400, padding, autoZoomOnResize = true, children }) => {
     const canvasEl = useRef<HTMLCanvasElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const canvasInstance = useRef<fabric.Canvas | null>(null);
@@ -165,6 +166,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
     }, [onCanvasReady]);
 
     // 2. Update Canvas Height
+    const initialRenderRef = useRef(true);
+
     useEffect(() => {
         logicalHeightRef.current = logicalHeight;
         logicalWidthRef.current = logicalWidth;
@@ -181,6 +184,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
     // 3. Auto-Fit Logic (Initial Load)
     useLayoutEffect(() => {
         if (!viewportRef.current) return;
+
+        // Skip auto-zoom if disabled AND it's not the very first render (we still want initial fit)
+        // Actually, preventing 'autoZoomOnResize' usually implies we want to keep current pan/scale.
+        if (!autoZoomOnResize && !initialRenderRef.current) return;
 
         const viewportW = viewportRef.current.clientWidth;
         const viewportH = viewportRef.current.clientHeight;
@@ -203,6 +210,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
 
         setScale(fitScale);
         setPan({ x: initialX, y: initialY });
+
+        initialRenderRef.current = false; // Mark initial render complete
 
     }, [logicalHeight, logicalWidth]); // Re-run if logical height/width changes
 
