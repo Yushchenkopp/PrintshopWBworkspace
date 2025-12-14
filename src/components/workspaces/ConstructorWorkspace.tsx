@@ -1,12 +1,13 @@
 import React from 'react';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Hammer, Construction } from 'lucide-react';
+import { LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Hammer, Construction, Shirt } from 'lucide-react';
 
 interface ConstructorWorkspaceProps {
     onSwitchTemplate: (template: TemplateType) => void;
+    onOpenMockup: () => void;
 }
 
-export const ConstructorWorkspace: React.FC<ConstructorWorkspaceProps> = ({ onSwitchTemplate }) => {
+export const ConstructorWorkspace: React.FC<ConstructorWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup }) => {
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
             {/* --- SIDEBAR --- */}
@@ -39,6 +40,11 @@ export const ConstructorWorkspace: React.FC<ConstructorWorkspaceProps> = ({ onSw
 
             {/* --- MAIN CONTENT --- */}
             <main className="flex-1 flex items-center justify-center p-8 relative overflow-hidden">
+                <div className="fixed top-6 right-6 flex gap-3 z-[100] items-center">
+                    <button onClick={onOpenMockup} className="flex items-center gap-2 bg-white/80 backdrop-blur-md border border-zinc-200 text-zinc-700 rounded-full py-2.5 px-6 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer transform-gpu will-change-transform [backface-visibility:hidden]">
+                        <Shirt className="w-3.5 h-3.5" /> Макет
+                    </button>
+                </div>
                 {/* Decorative Background Elements */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
                     <div className="absolute -top-20 -right-20 w-96 h-96 bg-blue-200/50 rounded-full blur-3xl animate-blob"></div>

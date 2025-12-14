@@ -7,9 +7,10 @@ import { exportHighRes } from '../../utils/ExportUtils';
 
 interface JerseyWorkspaceProps {
     onSwitchTemplate: (template: TemplateType) => void;
+    onOpenMockup: () => void;
 }
 
-export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTemplate }) => {
+export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [isReady, setIsReady] = useState(false);
 
@@ -359,8 +360,11 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
 
             {/* MAIN AREA */}
             <main className="flex-1 flex overflow-hidden relative">
-                <div className="fixed top-6 right-6 flex gap-3 z-[100]">
-                    <button onClick={() => canvas && exportHighRes(canvas)} className="flex items-center gap-2 bg-zinc-900 text-white rounded-full py-2.5 px-6 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer">
+                <div className="fixed top-6 right-6 flex gap-3 z-[100] items-center">
+                    <button onClick={onOpenMockup} className="flex items-center gap-2 bg-white/80 backdrop-blur-md border border-zinc-200 text-zinc-700 rounded-full py-2.5 px-6 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer transform-gpu will-change-transform [backface-visibility:hidden]">
+                        <Shirt className="w-3.5 h-3.5" /> Макет
+                    </button>
+                    <button onClick={() => canvas && exportHighRes(canvas)} className="flex items-center gap-2 bg-zinc-900 text-white rounded-full py-2.5 px-6 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer transform-gpu will-change-transform [backface-visibility:hidden]">
                         <ArrowDownToLine className="w-4 h-4" /> Файл
                     </button>
                 </div>

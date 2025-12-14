@@ -41,19 +41,31 @@ function App() {
       )}
 
       {template === 'papa' && (
-        <PapaWorkspace onSwitchTemplate={handleSwitchTemplate} />
+        <PapaWorkspace
+          onSwitchTemplate={handleSwitchTemplate}
+          onOpenMockup={() => setShowMockup(true)}
+        />
       )}
 
       {template === 'jersey' && (
-        <JerseyWorkspace onSwitchTemplate={handleSwitchTemplate} />
+        <JerseyWorkspace
+          onSwitchTemplate={handleSwitchTemplate}
+          onOpenMockup={() => setShowMockup(true)}
+        />
       )}
 
       {template === 'baby' && (
-        <BabyWorkspace onSwitchTemplate={handleSwitchTemplate} />
+        <BabyWorkspace
+          onSwitchTemplate={handleSwitchTemplate}
+          onOpenMockup={() => setShowMockup(true)}
+        />
       )}
 
       {template === 'constructor' && (
-        <ConstructorWorkspace onSwitchTemplate={handleSwitchTemplate} />
+        <ConstructorWorkspace
+          onSwitchTemplate={handleSwitchTemplate}
+          onOpenMockup={() => setShowMockup(true)}
+        />
       )}
     </div>
   );
