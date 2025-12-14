@@ -28,7 +28,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
     const [shirtColor, setShirtColor] = useState<'white' | 'black'>('white');
     const [selectedSize, setSelectedSize] = useState('M');
     // Coordinates fixed by user request
-    const [pos] = useState({ x: 40.15, y: 73.63 });
+    const [pos, setPos] = useState({ x: 40.18, y: 84 });
 
     // Front Print State
     const [frontPrint, setFrontPrint] = useState<string | null>(null);
@@ -309,26 +309,50 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
 
             console.log('Cropping (Rounded):', { cropX, cropY, cropWidth, cropHeight });
 
+            // Load Footer Image
+            const footerImg = new Image();
+            footerImg.crossOrigin = "anonymous";
+            footerImg.src = '/mockup/add-mockup.webp';
+            await new Promise((resolve, reject) => {
+                footerImg.onload = resolve;
+                footerImg.onerror = () => {
+                    console.warn('Footer image failed to load, proceeding without it.');
+                    resolve(null);
+                };
+            });
+
+            // Calculate Footer Dimensions
+            let footerHeight = 0;
+            if (footerImg.naturalWidth > 0) {
+                footerHeight = Math.round((footerImg.naturalHeight / footerImg.naturalWidth) * cropWidth);
+            }
+
             // Create Final Canvas
             const finalCanvas = document.createElement('canvas');
             finalCanvas.width = cropWidth;
-            finalCanvas.height = cropHeight;
+            finalCanvas.height = cropHeight + footerHeight; // Add height for footer
             const ctx = finalCanvas.getContext('2d');
 
             if (ctx) {
+                // Draw Standard Mockup
                 ctx.drawImage(
                     canvas,
                     cropX, cropY, cropWidth, cropHeight,
                     0, 0, cropWidth, cropHeight
                 );
 
+                // Draw Footer if loaded
+                if (footerHeight > 0) {
+                    ctx.drawImage(footerImg, 0, cropHeight, cropWidth, footerHeight);
+                }
+
                 let blob: Blob | null = null;
 
                 try {
                     // Optimization: Use UPNG for smaller file size
-                    const imgData = ctx.getImageData(0, 0, cropWidth, cropHeight);
+                    const imgData = ctx.getImageData(0, 0, cropWidth, cropHeight + footerHeight);
                     // 256 colors for significant reduction
-                    const upngBuffer = UPNG.encode([imgData.data.buffer], cropWidth, cropHeight, 256);
+                    const upngBuffer = UPNG.encode([imgData.data.buffer], cropWidth, cropHeight + footerHeight, 256);
                     blob = new Blob([upngBuffer], { type: 'image/png' });
                     console.log('UPNG Compression successful');
                 } catch (upngError) {
@@ -391,19 +415,40 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                 const cropWidth = Math.round((canvas.width * exportCrop.width) / 100);
                 const cropHeight = Math.round((canvas.height * exportCrop.height) / 100);
 
+                // Load Footer Image (Duplicate logic for fallback)
+                const footerImg = new Image();
+                footerImg.crossOrigin = "anonymous";
+                footerImg.src = '/mockup/add-mockup.webp';
+                await new Promise((resolve) => {
+                    footerImg.onload = resolve;
+                    footerImg.onerror = () => {
+                        console.warn('Fallback: Footer image failed to load');
+                        resolve(null);
+                    };
+                });
+
+                let footerHeight = 0;
+                if (footerImg.naturalWidth > 0) {
+                    footerHeight = Math.round((footerImg.naturalHeight / footerImg.naturalWidth) * cropWidth);
+                }
+
                 const finalCanvas = document.createElement('canvas');
                 finalCanvas.width = cropWidth;
-                finalCanvas.height = cropHeight;
+                finalCanvas.height = cropHeight + footerHeight;
                 const ctx = finalCanvas.getContext('2d');
 
                 if (ctx) {
                     ctx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
 
+                    if (footerHeight > 0) {
+                        ctx.drawImage(footerImg, 0, cropHeight, cropWidth, footerHeight);
+                    }
+
                     let blob: Blob | null = null;
 
                     try {
-                        const imgData = ctx.getImageData(0, 0, cropWidth, cropHeight);
-                        const upngBuffer = UPNG.encode([imgData.data.buffer], cropWidth, cropHeight, 256);
+                        const imgData = ctx.getImageData(0, 0, cropWidth, cropHeight + footerHeight);
+                        const upngBuffer = UPNG.encode([imgData.data.buffer], cropWidth, cropHeight + footerHeight, 256);
                         blob = new Blob([upngBuffer], { type: 'image/png' });
                     } catch (e) {
                         console.error('Fallback UPNG failed:', e);
@@ -697,6 +742,27 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                                 </div>
                             </div>
                         )}
+
+                        {isDebug && (
+                            <div className="bg-blue-50 p-3 rounded-xl border border-blue-200 mt-2 space-y-3">
+                                <div className="text-[10px] font-bold text-blue-600 uppercase mb-1">Size Label</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(['x', 'y'] as const).map((prop) => (
+                                        <div key={`size-${prop}`} className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-bold text-blue-600 uppercase">{prop} (%)</label>
+                                            <input
+                                                type="number"
+                                                value={pos[prop]}
+                                                onChange={(e) => setPos(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
+                                                className="w-full rounded border border-blue-200 bg-white px-2 py-1 text-xs text-blue-900 outline-none"
+                                                step="0.01"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {isExportCalibration && (
                             <div className="bg-green-50 p-3 rounded-xl border border-green-200 mt-2 grid grid-cols-2 gap-2">
                                 {['top', 'left', 'width', 'height'].map((prop) => (
