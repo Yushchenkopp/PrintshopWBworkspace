@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Download, ArrowLeft, ImagePlus, Trash2, Copy } from 'lucide-react';
-import { downloadPrintImage, generateCompositeMockup } from '../utils/ExportUtils';
+import { Download, ArrowLeft, ImagePlus, Trash2, Copy, Loader2 } from 'lucide-react';
+import { downloadPrintImage } from '../utils/ExportUtils';
+import { toCanvas } from 'html-to-image';
+import UPNG from 'upng-js';
 
 
 interface MockupEnvironmentProps {
@@ -44,20 +46,19 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
 
 
     // Print Area Calibration State
-    // const [isDebug, setIsDebug] = useState(false); // Removed
-    const [printArea] = useState({ top: 32, left: 18, width: 13, height: 38 });
-    const [backPrintArea] = useState({ top: 31, left: 49, width: 14, height: 39 }); // Default right side position
+    const [isDebug, setIsDebug] = useState(false);
+    const [printArea, setPrintArea] = useState({ top: 32, left: 17.5, width: 13, height: 38 });
+    const [backPrintArea, setBackPrintArea] = useState({ top: 31, left: 49, width: 14, height: 39 }); // Default right side position
 
-    // Export Configuration (Hardcoded User Calibration)
-    const EXPORT_CROP_CONFIG = { top: 11, left: 6, width: 69, height: 78 };
-
-    // Export Calibration State (Removed as hardcoded)
-    // const [isExportCalibration, setIsExportCalibration] = useState(false);
-    // const [exportCrop, setExportCrop] = useState(EXPORT_CROP_CONFIG);
+    // Export Calibration State
+    const [isExportCalibration, setIsExportCalibration] = useState(false);
+    const [exportCrop, setExportCrop] = useState({ top: 11, left: 7, width: 67, height: 78 });
 
     // Drag State
 
     const [dragOverZone, setDragOverZone] = useState<'front' | 'back' | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
+    const previewRef = React.useRef<HTMLDivElement>(null);
 
 
 
@@ -254,69 +255,185 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
         }
     };
 
-    // Export Functions
-    const handleExportMockup = async (mode: 'download' | 'copy') => {
+    const handleExport = async (action: 'copy' | 'download') => {
+        if (!previewRef.current) {
+            console.error('Preview ref is null');
+            return;
+        }
+        setIsExporting(true);
+        console.log('Starting export...', action);
+
         try {
-            const prints = [];
-            // Add Front Print
-            if (frontPrint) {
-                const offsetPercentY = (frontPrintY - MIN_OFFSET_CM) / ZONE_HEIGHT_CM;
-                const actualTop = printArea.top + (offsetPercentY * printArea.height);
+            // Temporarily hide debug overlays for capture if they are active
+            // Simplify: just capture for now to test stability
+            // const wasDebug = isDebug;
+            // const wasExportCalib = isExportCalibration;
+            // if (wasDebug) setIsDebug(false);
+            // if (wasExportCalib) setIsExportCalibration(false);
 
-                const actualWidth = printArea.width * frontPrintSize;
-                const actualLeft = printArea.left + ((printArea.width - actualWidth) / 2);
+            // Wait for state update/render
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-                prints.push({
-                    url: frontPrint,
-                    xPercent: actualLeft,
-                    yPercent: actualTop,
-                    widthPercent: actualWidth
+            console.log('Capturing canvas with html-to-image...');
+            const canvas = await toCanvas(previewRef.current, {
+                cacheBust: false, // Potentially causing 404s on static assets
+                pixelRatio: 2, // High DPI
+                backgroundColor: '#e4e4e7',
+                // Explicitly allow external images if needed
+                includeQueryParams: false,
+                filter: (node) => {
+                    // Exclude the back button and other UI controls from export
+                    if (node instanceof HTMLElement) {
+                        if (node.tagName === 'BUTTON' && node.querySelector('svg.lucide-arrow-left')) {
+                            return false;
+                        }
+                        // Also exclude the export crop overlay if it happens to be visible
+                        if (node.textContent?.includes('Export Zone')) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            });
+            console.log('Canvas captured.', canvas.width, canvas.height);
+
+            // Restore debug state
+            // if (wasDebug) setIsDebug(true);
+            // if (wasExportCalib) setIsExportCalibration(true);
+
+            // Calculate Crop (Round to integers to avoid sub-pixel issues with UPNG)
+            const cropX = Math.round((canvas.width * exportCrop.left) / 100);
+            const cropY = Math.round((canvas.height * exportCrop.top) / 100);
+            const cropWidth = Math.round((canvas.width * exportCrop.width) / 100);
+            const cropHeight = Math.round((canvas.height * exportCrop.height) / 100);
+
+            console.log('Cropping (Rounded):', { cropX, cropY, cropWidth, cropHeight });
+
+            // Create Final Canvas
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = cropWidth;
+            finalCanvas.height = cropHeight;
+            const ctx = finalCanvas.getContext('2d');
+
+            if (ctx) {
+                ctx.drawImage(
+                    canvas,
+                    cropX, cropY, cropWidth, cropHeight,
+                    0, 0, cropWidth, cropHeight
+                );
+
+                let blob: Blob | null = null;
+
+                try {
+                    // Optimization: Use UPNG for smaller file size
+                    const imgData = ctx.getImageData(0, 0, cropWidth, cropHeight);
+                    // 256 colors for significant reduction
+                    const upngBuffer = UPNG.encode([imgData.data.buffer], cropWidth, cropHeight, 256);
+                    blob = new Blob([upngBuffer], { type: 'image/png' });
+                    console.log('UPNG Compression successful');
+                } catch (upngError) {
+                    console.error('UPNG Compression failed, falling back to standard PNG:', upngError);
+                    // Fallback to standard blob
+                    blob = await new Promise(resolve => finalCanvas.toBlob(resolve, 'image/png'));
+                }
+
+                if (blob) {
+                    if (action === 'download') {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.download = `mockup-export-${selectedSize}-${Date.now()}.png`;
+                        link.href = url;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                        console.log('Download triggered');
+                    } else {
+                        const item = new ClipboardItem({ 'image/png': blob });
+                        navigator.clipboard.write([item]);
+                        console.log('Clipboard write success');
+                        alert('Copied to clipboard!');
+                    }
+                }
+            }
+
+        } catch (error: any) {
+            console.error('Export failed (Attempt 1):', error);
+
+            // Log specific error details if available
+            if (error.target) {
+                console.error('Error target:', error.target);
+                if (error.target.src) console.error('Error src:', error.target.src);
+            }
+
+            try {
+                console.log('Retrying export without filters (Fallback)...');
+                const canvas = await toCanvas(previewRef.current, {
+                    cacheBust: false,
+                    pixelRatio: 2,
+                    backgroundColor: '#e4e4e7',
+                    skipFonts: true, // Skip fonts in fallback
+                    filter: (node) => {
+                        // Same filters
+                        if (node instanceof HTMLElement) {
+                            if (node.tagName === 'BUTTON' && node.querySelector('svg.lucide-arrow-left')) return false;
+                            if (node.textContent?.includes('Export Zone')) return false;
+                        }
+                        return true;
+                    },
+                    style: {
+                        // Force remove filters in fallback
+                        filter: 'none'
+                    }
                 });
+
+                // ... Process canvas (Reuse logic)
+                const cropX = Math.round((canvas.width * exportCrop.left) / 100);
+                const cropY = Math.round((canvas.height * exportCrop.top) / 100);
+                const cropWidth = Math.round((canvas.width * exportCrop.width) / 100);
+                const cropHeight = Math.round((canvas.height * exportCrop.height) / 100);
+
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = cropWidth;
+                finalCanvas.height = cropHeight;
+                const ctx = finalCanvas.getContext('2d');
+
+                if (ctx) {
+                    ctx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+                    let blob: Blob | null = null;
+
+                    try {
+                        const imgData = ctx.getImageData(0, 0, cropWidth, cropHeight);
+                        const upngBuffer = UPNG.encode([imgData.data.buffer], cropWidth, cropHeight, 256);
+                        blob = new Blob([upngBuffer], { type: 'image/png' });
+                    } catch (e) {
+                        console.error('Fallback UPNG failed:', e);
+                        blob = await new Promise(resolve => finalCanvas.toBlob(resolve, 'image/png'));
+                    }
+
+                    if (blob) {
+                        if (action === 'download') {
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.download = `mockup-export-${selectedSize}-${Date.now()}.png`;
+                            link.href = url;
+                            link.click();
+                            URL.revokeObjectURL(url);
+                            console.log('Fallback download successful');
+                        } else {
+                            const item = new ClipboardItem({ 'image/png': blob });
+                            navigator.clipboard.write([item]);
+                            alert('Copied to clipboard (Fallback mode: Filters disabled)');
+                        }
+                    }
+                }
+
+            } catch (retryError) {
+                console.error('Fallback export failed:', retryError);
+                alert(`Export failed completely. Check console for 'object Event' details. Try checking network tab for 404s on images/fonts.`);
             }
 
-            // Add Back Print
-            if (backPrint) {
-                const offsetPercentY = (backPrintY - MIN_BACK_OFFSET_CM) / ZONE_HEIGHT_CM;
-                const actualTop = backPrintArea.top + (offsetPercentY * backPrintArea.height);
-
-                const actualWidth = backPrintArea.width * backPrintSize;
-                const actualLeft = backPrintArea.left + ((backPrintArea.width - actualWidth) / 2);
-
-                prints.push({
-                    url: backPrint,
-                    xPercent: actualLeft,
-                    yPercent: actualTop,
-                    widthPercent: actualWidth
-                });
-            }
-
-            const baseImgUrl = `/mockup/mockup-${shirtColor}-full.webp`;
-            const EXPORT_CROP_CONFIG = { top: 11, left: 6, width: 69, height: 78 };
-
-            const blob = await generateCompositeMockup(baseImgUrl, prints, EXPORT_CROP_CONFIG);
-            if (!blob) throw new Error("Blob generation failed");
-
-            if (mode === 'download') {
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.download = `mockup-${shirtColor}-${new Date().getTime()}.jpg`;
-                link.href = url;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            } else {
-                await navigator.clipboard.write([
-                    new ClipboardItem({
-                        [blob.type]: blob
-                    })
-                ]);
-                alert("Copied to clipboard!");
-            }
-
-        } catch (e) {
-            console.error("Export Error:", e);
-            alert("Экспорт не удался.");
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -331,26 +448,31 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
             {/* Modal Window */}
             <div className="relative w-[95vw] h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-200">
                 {/* SVG Filter Definition for Fabric Texture */}
-                <svg className="absolute w-0 h-0 pointer-events-none">
-                    <filter id="fabric-texture">
-                        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
-                        <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
-                        <feComposite operator="in" in="coloredNoise" in2="SourceAlpha" result="grain" />
-                        <feBlend mode="multiply" in="grain" in2="SourceGraphic" />
-                    </filter>
-                </svg>
+
 
 
 
                 {/* --- FULL BACKGROUND: Image Preview --- */}
                 <div
+                    ref={previewRef}
                     className="absolute inset-0 bg-[#e4e4e7]"
                 >
+                    {/* SVG Filter Definition (Moved inside for export capture) */}
+                    <svg className="absolute w-0 h-0 pointer-events-none">
+                        <filter id="fabric-texture">
+                            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
+                            <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
+                            <feComposite operator="in" in="coloredNoise" in2="SourceAlpha" result="grain" />
+                            <feBlend mode="multiply" in="grain" in2="SourceGraphic" />
+                        </filter>
+                    </svg>
+
                     <AnimatePresence mode="popLayout">
                         <motion.img
                             key={shirtColor}
                             src={`/mockup/mockup-${shirtColor}-full.webp`}
                             alt="T-Shirt Mockup"
+                            crossOrigin="anonymous"
                             initial={{ opacity: 0, scale: 1.05 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0 }}
@@ -366,7 +488,9 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                             top: `${printArea.top}%`,
                             left: `${printArea.left}%`,
                             width: `${printArea.width}%`,
-                            height: `${printArea.height}%`
+                            height: `${printArea.height}%`,
+                            border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
+                            backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
                         }}
                     >
 
@@ -411,7 +535,9 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                             top: `${backPrintArea.top}%`,
                             left: `${backPrintArea.left}%`,
                             width: `${backPrintArea.width}%`,
-                            height: `${backPrintArea.height}%`
+                            height: `${backPrintArea.height}%`,
+                            border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
+                            backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
                         }}
                     >
 
@@ -484,7 +610,6 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                     </div>
 
                     {/* Export Crop Overlay */}
-                    {/* Export Crop Overlay (Disabled)
                     {isExportCalibration && (
                         <div
                             className="absolute pointer-events-none z-50 border-2 border-green-500 bg-green-500/10"
@@ -499,7 +624,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                                 Export Zone
                             </div>
                         </div>
-                    )} */}
+                    )}
                 </div>
 
                 {/* --- RIGHT FLOATING SIDEBAR --- */}
@@ -519,16 +644,59 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                         {/* HEADER */}
                         <div className="flex justify-between items-center">
                             <h2 className="text-2xl font-black text-zinc-900 tracking-tight">Макет</h2>
-                            {/* <button
-                                onClick={() => setIsExportCalibration(!isExportCalibration)}
-                                className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isExportCalibration ? 'bg-green-50 text-green-600 border-green-200' : 'bg-transparent text-zinc-300 border-zinc-100'}`}
-                            >
-                                Calibration
-                            </button> */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setIsDebug(!isDebug)}
+                                    className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isDebug ? 'bg-red-50 text-red-600 border-red-200' : 'bg-transparent text-zinc-300 border-zinc-100'}`}
+                                >
+                                    Limits
+                                </button>
+                                <button
+                                    onClick={() => setIsExportCalibration(!isExportCalibration)}
+                                    className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isExportCalibration ? 'bg-green-50 text-green-600 border-green-200' : 'bg-transparent text-zinc-300 border-zinc-100'}`}
+                                >
+                                    Export
+                                </button>
+                            </div>
                         </div>
 
+
                         {/* Calibration Controls */}
-                        {/* Calibration Controls (Disabled)
+                        {isDebug && (
+                            <div className="bg-red-50 p-3 rounded-xl border border-red-200 mt-2 space-y-3">
+                                <div className="text-[10px] font-bold text-red-600 uppercase mb-1">Front Zone</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(['top', 'left', 'width', 'height'] as const).map((prop) => (
+                                        <div key={`front-${prop}`} className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-bold text-red-600 uppercase">{prop} (%)</label>
+                                            <input
+                                                type="number"
+                                                value={printArea[prop]}
+                                                onChange={(e) => setPrintArea(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
+                                                className="w-full rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-900 outline-none"
+                                                step="0.1"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="h-px bg-red-200/50" />
+                                <div className="text-[10px] font-bold text-red-600 uppercase mb-1">Back Zone</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(['top', 'left', 'width', 'height'] as const).map((prop) => (
+                                        <div key={`back-${prop}`} className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-bold text-red-600 uppercase">{prop} (%)</label>
+                                            <input
+                                                type="number"
+                                                value={backPrintArea[prop]}
+                                                onChange={(e) => setBackPrintArea(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
+                                                className="w-full rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-900 outline-none"
+                                                step="0.1"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         {isExportCalibration && (
                             <div className="bg-green-50 p-3 rounded-xl border border-green-200 mt-2 grid grid-cols-2 gap-2">
                                 {['top', 'left', 'width', 'height'].map((prop) => (
@@ -543,7 +711,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                                     </div>
                                 ))}
                             </div>
-                        )} */}
+                        )}
 
                         {/* ZONE 1: PARAMETERS */}
                         <section className="space-y-4">
@@ -605,8 +773,8 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                                     >
                                         {frontPrint ? (
                                             <div
-                                                className={`w-full h-full rounded-2xl border bg-white overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300
-                                                    ${dragOverZone === 'front' ? 'border-zinc-900 ring-2 ring-zinc-900/10 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-lg hover:-translate-y-0.5'}
+                                                className={`w-full h-full rounded-2xl border overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300 bg-transparent
+                                                    ${dragOverZone === 'front' ? 'border-zinc-900 ring-2 ring-zinc-900/10' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-lg hover:-translate-y-0.5'}
                                                 `}
                                                 draggable="true"
                                                 onDragStart={(e) => handleDragStart(e, 'front')}
@@ -728,8 +896,8 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                                     >
                                         {backPrint ? (
                                             <div
-                                                className={`w-full h-full rounded-2xl border bg-white overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300
-                                                    ${dragOverZone === 'back' ? 'border-zinc-900 ring-2 ring-zinc-900/10 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-lg hover:-translate-y-0.5'}
+                                                className={`w-full h-full rounded-2xl border overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300 bg-transparent
+                                                    ${dragOverZone === 'back' ? 'border-zinc-900 ring-2 ring-zinc-900/10' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-lg hover:-translate-y-0.5'}
                                                 `}
                                                 draggable="true"
                                                 onDragStart={(e) => handleDragStart(e, 'back')}
@@ -837,18 +1005,20 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
                         <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Экспорт</h3>
                         <div className="grid grid-cols-2 gap-3">
                             <button
-                                onClick={() => handleExportMockup('copy')}
-                                className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                onClick={() => handleExport('copy')}
+                                disabled={isExporting}
+                                className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                             >
-                                <Copy className="w-4 h-4" />
-                                Копировать
+                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                                {isExporting ? '...' : 'Копировать'}
                             </button>
                             <button
-                                onClick={() => handleExportMockup('download')}
-                                className="h-12 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-zinc-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                onClick={() => handleExport('download')}
+                                disabled={isExporting}
+                                className="h-12 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-zinc-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                             >
-                                <Download className="w-4 h-4" />
-                                Скачать
+                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                {isExporting ? '...' : 'Скачать'}
                             </button>
                         </div>
                     </div>
