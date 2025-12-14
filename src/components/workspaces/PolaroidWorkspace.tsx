@@ -25,7 +25,10 @@ import { exportHighRes } from '../../utils/ExportUtils';
 
 interface PolaroidWorkspaceProps {
     onSwitchTemplate: (template: TemplateType) => void;
+    onOpenMockup: () => void;
 }
+
+// ... (skipping unchanged code)
 
 // Constants for Polaroid Windows (Approximate - need calibration)
 // Assuming 2480x3508 (A4) or similar. 
@@ -38,7 +41,7 @@ const SLOTS = [
     { x: 652, y: 24, w: 533, h: 472 }
 ];
 
-export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate }) => {
+export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [parent] = useAutoAnimate();
     // Fixed 2 slots for Polaroid: [Left, Right]
@@ -671,9 +674,12 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
             </aside>
 
             <main className="flex-1 flex overflow-hidden relative">
-                <div className="fixed top-6 right-6 flex gap-3 z-[100]">
+                <div className="fixed top-6 right-6 flex flex-col gap-3 items-end z-[100]">
                     <button onClick={() => canvas && exportHighRes(canvas)} className="flex items-center gap-2 bg-zinc-900 text-white rounded-full py-2.5 px-6 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer">
                         <ArrowDownToLine className="w-4 h-4" /> Файл
+                    </button>
+                    <button onClick={onOpenMockup} className="flex items-center gap-2 bg-white/80 backdrop-blur-md border border-zinc-200 text-zinc-700 rounded-full py-2 px-5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-xs cursor-pointer">
+                        <Shirt className="w-3.5 h-3.5" /> Макет
                     </button>
                 </div>
                 <div className={`flex-1 relative overflow-hidden transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'}`}>

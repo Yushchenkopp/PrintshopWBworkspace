@@ -2,7 +2,7 @@ import UPNG from 'upng-js';
 import * as fabric from 'fabric';
 
 // Helper to set DPI in PNG Blob
-const setDpi = (blob: Blob, dpi: number): Promise<Blob> => {
+export const setDpi = (blob: Blob, dpi: number): Promise<Blob> => {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.readAsArrayBuffer(blob);
@@ -318,5 +318,174 @@ export const exportSvgElement = async (svgElement: SVGSVGElement, filename: stri
     } catch (error) {
         console.error("SVG Export failed:", error);
         alert("Ошибка при сохранении SVG. Проверьте консоль.");
+    }
+}
+
+
+export const downloadPrintImage = async (imageUrl: string, widthCm: number, heightCm: number) => {
+    try {
+        // 1. Calculate Target Pixels at 200 DPI
+        // 1 inch = 2.54 cm
+        const dpi = 200;
+        const targetWidthPx = Math.round((widthCm / 2.54) * dpi);
+        const targetHeightPx = Math.round((heightCm / 2.54) * dpi);
+
+        // 2. Load Image
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = reject;
+            img.src = imageUrl;
+        });
+
+        // 3. Draw to Resized Canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidthPx;
+        canvas.height = targetHeightPx;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Canvas context failed");
+
+        // High quality scaling
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, targetWidthPx, targetHeightPx);
+
+        // 4. Encode to PNG with UPNG (for smaller size if needed, or just standard toBlob)
+        // Using UPNG for consistency and compression control (optional here, but good for file size)
+        const imgData = ctx.getImageData(0, 0, targetWidthPx, targetHeightPx);
+        const upngBuffer = UPNG.encode([imgData.data.buffer], targetWidthPx, targetHeightPx, 256);
+        let blob = new Blob([upngBuffer], { type: 'image/png' });
+
+        // 5. Inject DPI
+        blob = await setDpi(blob, dpi);
+
+        // 6. Download
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        link.download = `print_${widthCm.toFixed(0)}x${heightCm.toFixed(0)}cm_${timestamp}.png`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error("Print download field:", error);
+        alert("Ошибка при скачивании файла.");
+    }
+};
+
+interface PrintLayer {
+    url: string;
+    xPercent: number; // 0-100 relative to full uncropped base
+    yPercent: number; // 0-100 relative to full uncropped base
+    widthPercent: number; // 0-100 relative to full uncropped base
+    heightPercent?: number; // Optional, can act as max-height or we rely on ratio
+}
+
+interface ExportConfig {
+    top: number; // %
+    left: number; // %
+    width: number; // %
+    height: number; // %
+}
+
+export const generateCompositeMockup = async (
+    baseImageUrl: string,
+    prints: PrintLayer[],
+    crop: ExportConfig
+): Promise<Blob | null> => {
+    try {
+        // 1. Load Base Image
+        const baseImg = new Image();
+        baseImg.crossOrigin = "anonymous";
+        await new Promise<void>((resolve, reject) => {
+            baseImg.onload = () => resolve();
+            baseImg.onerror = (e) => reject(new Error(`Failed to load base image: ${String(e)}`));
+            baseImg.src = baseImageUrl;
+        });
+
+        // 2. Determine Dimensions
+        const fullW = baseImg.naturalWidth;
+        const fullH = baseImg.naturalHeight;
+
+        // 3. Calculate Crop (Pixels)
+        const cropX = Math.round((crop.left / 100) * fullW);
+        const cropY = Math.round((crop.top / 100) * fullH);
+        const cropW = Math.round((crop.width / 100) * fullW);
+        const cropH = Math.round((crop.height / 100) * fullH);
+
+        // 4. Create Canvas sized to the CROP
+        const canvas = document.createElement('canvas');
+        canvas.width = cropW;
+        canvas.height = cropH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Canvas context failed");
+
+        // High Quality Settings
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // 5. Draw Base Image (Shifted by -cropX, -cropY)
+        // We draw the relevant slice of the source image onto the canvas 0,0
+        ctx.drawImage(
+            baseImg,
+            cropX, cropY, cropW, cropH, // Source Crop
+            0, 0, cropW, cropH          // Dest Rect
+        );
+
+        // 6. Draw Prints
+        // Layering order: Front -> Back (controlled by array order)
+        for (const print of prints) {
+            const printImg = new Image();
+            printImg.crossOrigin = "anonymous";
+            await new Promise<void>((resolve, reject) => {
+                printImg.onload = () => resolve();
+                printImg.onerror = () => {
+                    console.warn("Failed to load print for export", print.url);
+                    resolve(); // Skip but continue
+                };
+                printImg.src = print.url;
+            });
+
+            // Calculate Print Position on FULL Base
+            const pX = (print.xPercent / 100) * fullW;
+            const pY = (print.yPercent / 100) * fullH;
+            const pW = (print.widthPercent / 100) * fullW;
+
+            // Calculate Height maintaining aspect ratio if not explicit
+            const ratio = printImg.naturalHeight / printImg.naturalWidth;
+            const pH = print.heightPercent
+                ? (print.heightPercent / 100) * fullH
+                : pW * ratio;
+
+            // Map to Cropped Canvas Coordinates
+            // DestX = pX - cropX
+            const destX = pX - cropX;
+            const destY = pY - cropY;
+
+            // Verify Visibility (Optional optimization, drawImage handles it)
+            // Apply Blend Modes if needed (Multiply for realism)
+            // We can check brightness of underlying pixels but that is complex.
+            // Simple Multiply is standard for mockups on white.
+            // But we don't pass 'shirtColor' here easily. 
+            // We'll stick to 'Normal' for universal support or add a param later.
+            // User requested "Premium", maybe multiply? 
+            // Let's assume Normal for safety for now unless print is black on black.
+            // Actually, MockupEnvironment uses multiply for white shirts.
+            // Let's rely on standard copy for now.
+
+            ctx.drawImage(printImg, destX, destY, pW, pH);
+        }
+
+        // 7. Export to Blob
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95)); // JPEG 95% for mockup
+        return blob;
+
+    } catch (e) {
+        console.error("Composite Mockup Gen Failed:", e);
+        return null;
     }
 };
