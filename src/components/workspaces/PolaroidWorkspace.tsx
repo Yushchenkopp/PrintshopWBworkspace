@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Sun } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Sun, Shirt } from 'lucide-react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
@@ -585,7 +585,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 <section>
 
                     {images.every(img => img === null) ? (
-                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
+                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-[110px] flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
                             <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => {
                                 handleImageUpload(e);
                             }} />
@@ -618,7 +618,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         </DndContext>
                     )}
                     {images.some(img => img !== null) && (
-                        <button onClick={handleClearCanvas} className="mt-8 text-xs text-zinc-400 font-medium flex items-center gap-1 hover:bg-red-50 hover:text-red-600 rounded-md px-2 py-1 cursor-pointer">
+                        <button onClick={handleClearCanvas} className="mt-4 text-xs text-zinc-400 font-medium flex items-center gap-1 hover:bg-red-50 hover:text-red-600 rounded-md px-2 py-1 cursor-pointer">
                             <Trash2 className="w-3 h-3" /> Очистить всё
                         </button>
                     )}
@@ -658,6 +658,16 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                     />
                 </section>
+
+                {/* Primary Action Button (Section Style / Large) */}
+                <div className="flex justify-center mt-4 p-4">
+                    <button
+                        className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 cursor-pointer transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900 active:scale-95 group relative transform-gpu will-change-transform [backface-visibility:hidden]"
+                        title="На макет"
+                    >
+                        <Shirt className="w-7 h-7 transform-gpu will-change-transform" strokeWidth={2} />
+                    </button>
+                </div>
             </aside>
 
             <main className="flex-1 flex overflow-hidden relative">

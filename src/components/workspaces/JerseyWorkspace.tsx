@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Type, Hash } from 'lucide-react';
+import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Type, Hash, Shirt } from 'lucide-react';
 import * as fabric from 'fabric';
 import { exportHighRes } from '../../utils/ExportUtils';
 
@@ -253,7 +253,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         </button>
                     </div>
 
-                    <div className="relative group w-full mb-3">
+                    <div className="relative group w-full mb-4">
                         <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                         <input
                             type="text"
@@ -264,7 +264,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         />
                     </div>
 
-                    <div className="relative group w-full mb-3">
+                    <div className="relative group w-full mb-4">
                         <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                         <input
                             type="text"
@@ -345,6 +345,16 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         </div>
                     </div>
                 </section>
+
+                {/* Primary Action Button (Section Style / Large) */}
+                <div className="flex justify-center mt-4 p-4">
+                    <button
+                        className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 cursor-pointer transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900 active:scale-95 group relative transform-gpu will-change-transform [backface-visibility:hidden]"
+                        title="На макет"
+                    >
+                        <Shirt className="w-7 h-7 transform-gpu will-change-transform" strokeWidth={2} />
+                    </button>
+                </div>
             </aside>
 
             {/* MAIN AREA */}

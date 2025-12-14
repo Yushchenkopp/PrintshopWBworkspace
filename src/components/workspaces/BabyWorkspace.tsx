@@ -4,7 +4,7 @@ import { generateBabyTemplate, updateBabyHeader, updateCollageFilters, updateIma
 import type { TemplateType } from '../../utils/TemplateGenerators';
 import { transliterate } from '../../utils/Transliteration';
 import { exportHighRes } from '../../utils/ExportUtils';
-import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Type, User, Calendar, Sun } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Type, User, Calendar, Sun, Shirt } from 'lucide-react';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
 
@@ -395,7 +395,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                     {/* Header Row: Input + Lines Control */}
 
                     {/* Header Row: Input + Lines Control */}
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex gap-2 mb-4">
                         {/* Header Input */}
                         <div className="relative group flex-1">
                             <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
@@ -431,24 +431,24 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
 
                     {/* Translit Toggle (Moved here) */}
                     <div className="flex items-center gap-2 mb-4 pl-1">
-                        <span className="text-xs font-bold text-zinc-500 tracking-wide w-[60px]">Транслит</span>
+                        <span className="text-[10px] font-bold text-zinc-400 tracking-wide w-[60px]">Транслит</span>
                         <button
                             onClick={() => setIsTranslitEnabled(!isTranslitEnabled)}
-                            className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                            className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isTranslitEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
                         >
-                            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isTranslitEnabled ? 'left-[14px]' : 'left-0.5'}`} />
                         </button>
                     </div>
 
 
                     {/* Footer Toggle (Baby Only) */}
-                    <div className="flex items-center gap-2 mb-2 pl-1">
-                        <span className="text-xs font-bold text-zinc-500 tracking-wide w-[60px]">Подвал</span>
+                    <div className="flex items-center gap-2 mb-4 pl-1">
+                        <span className="text-[10px] font-bold text-zinc-400 tracking-wide w-[60px]">Подвал</span>
                         <button
                             onClick={() => setIsFooterEnabled(!isFooterEnabled)}
-                            className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isFooterEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                            className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isFooterEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
                         >
-                            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isFooterEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isFooterEnabled ? 'left-[14px]' : 'left-0.5'}`} />
                         </button>
                     </div>
 
@@ -457,7 +457,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                     {isFooterEnabled && (
                         <>
                             {/* Name & Date Row */}
-                            <div className="flex gap-2 mb-3">
+                            <div className="flex gap-2 mb-4">
                                 <div className="relative group flex-1">
                                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                                     <input
@@ -483,7 +483,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                             {/* Settings Row: Since + Translit */}
                             <div className="flex items-center gap-4 mb-3 pl-1">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-zinc-500 tracking-wide w-[60px]">Since</span>
+                                    <span className="text-[10px] font-bold text-zinc-400 tracking-wide w-[60px]">Since</span>
                                     <button
                                         onClick={() => {
                                             const newValue = !isSinceEnabled;
@@ -495,15 +495,15 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                                                 setFooterDate(lastDateRef.current || '05.09.2025');
                                             }
                                         }}
-                                        className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isSinceEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                                        className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isSinceEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
                                     >
-                                        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isSinceEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isSinceEnabled ? 'left-[14px]' : 'left-0.5'}`} />
                                     </button>
                                 </div>
                             </div>
 
                             {/* Signature Settings */}
-                            <div className="mt-1 mb-3">
+                            <div className="mt-4 mb-8">
                                 {!isSignatureEnabled ? (
                                     <button
                                         onClick={() => setIsSignatureEnabled(true)}
@@ -612,7 +612,17 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate }
                         />
                     </div>
                 </section>
-            </aside >
+
+                {/* Primary Action Button (Section Style / Large) */}
+                <div className="flex justify-center mt-4 p-4">
+                    <button
+                        className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 cursor-pointer transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900 active:scale-95 group relative transform-gpu will-change-transform [backface-visibility:hidden]"
+                        title="На макет"
+                    >
+                        <Shirt className="w-7 h-7 transform-gpu will-change-transform" strokeWidth={2} />
+                    </button>
+                </div>
+            </aside>
             <main className="flex-1 flex overflow-hidden relative">
                 <div className="fixed top-6 right-6 flex gap-3 z-[100]">
                     <button onClick={() => canvas && exportHighRes(canvas)} className="flex items-center gap-2 bg-zinc-900 text-white rounded-full py-2.5 px-6 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer">

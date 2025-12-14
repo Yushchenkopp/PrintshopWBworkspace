@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import * as fabric from 'fabric';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, ImagePlus, Trash2, Sun, Plus } from 'lucide-react';
+import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, ImagePlus, Trash2, Sun, Plus, Shirt } from 'lucide-react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import heic2any from 'heic2any';
 import { exportHighRes } from '../../utils/ExportUtils';
@@ -485,7 +485,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
 
 
                     {images.every(img => img === null) ? (
-                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
+                        <label className="upload-photo-block border-2 border-dashed border-zinc-200/50 hover:border-zinc-400 hover:bg-zinc-100/50 rounded-2xl h-[110px] flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group">
                             <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => handleImageUpload(e)} />
                             <ImagePlus className="w-8 h-8 text-zinc-300 mb-2 group-hover:text-zinc-400 transition-colors" />
                             <span className="text-sm font-medium text-zinc-600">Загрузить фото</span>
@@ -517,7 +517,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                     )}
 
                     {images.some(img => img !== null) && (
-                        <button onClick={handleClearAll} className="mt-8 text-xs text-zinc-400 font-medium flex items-center gap-1 hover:bg-red-50 hover:text-red-600 rounded-md px-2 py-1 cursor-pointer">
+                        <button onClick={handleClearAll} className="mt-4 text-xs text-zinc-400 font-medium flex items-center gap-1 hover:bg-red-50 hover:text-red-600 rounded-md px-2 py-1 cursor-pointer">
                             <Trash2 className="w-3 h-3" /> Очистить всё
                         </button>
                     )}
@@ -537,6 +537,30 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
 
                 <section>
                     <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            {/* B/W Toggle */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Ч/Б</span>
+                                <button
+                                    onClick={() => setIsGrayscale(!isGrayscale)}
+                                    className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isGrayscale ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isGrayscale ? 'left-[14px]' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+
+                            {/* Border Toggle */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Обводка</span>
+                                <button
+                                    onClick={() => setIsBorderEnabled(!isBorderEnabled)}
+                                    className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${isBorderEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isBorderEnabled ? 'left-[14px]' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Brightness Control */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
@@ -555,32 +579,18 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate }
                                 className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                             />
                         </div>
-
-                        <div className="flex items-center justify-between">
-                            {/* B/W Toggle */}
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Ч/Б</span>
-                                <button
-                                    onClick={() => setIsGrayscale(!isGrayscale)}
-                                    className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isGrayscale ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                                >
-                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isGrayscale ? 'left-[18px]' : 'left-0.5'}`} />
-                                </button>
-                            </div>
-
-                            {/* Border Toggle */}
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-zinc-400 tracking-wide">Обводка</span>
-                                <button
-                                    onClick={() => setIsBorderEnabled(!isBorderEnabled)}
-                                    className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${isBorderEnabled ? 'bg-zinc-900' : 'bg-zinc-200'}`}
-                                >
-                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${isBorderEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </section>
+
+                {/* Primary Action Button (Section Style / Large) */}
+                <div className="flex justify-center mt-4 p-4">
+                    <button
+                        className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 cursor-pointer transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900 active:scale-95 group relative transform-gpu will-change-transform [backface-visibility:hidden]"
+                        title="На макет"
+                    >
+                        <Shirt className="w-7 h-7 transform-gpu will-change-transform" strokeWidth={2} />
+                    </button>
+                </div>
             </aside>
 
             {/* MAIN CONTENT */}

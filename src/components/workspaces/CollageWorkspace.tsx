@@ -4,7 +4,7 @@ import { generateCollageTemplate, updateCollageHeader, updateCollageFilters } fr
 import type { TemplateType } from '../../utils/TemplateGenerators';
 import { transliterate } from '../../utils/Transliteration';
 import { exportHighRes } from '../../utils/ExportUtils';
-import { Trash2, ImagePlus, ArrowDownToLine, Sun, Type, User, Calendar, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, Sun, Type, User, Calendar, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Shirt } from 'lucide-react';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
 import {
@@ -565,6 +565,16 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                             onChange={(e) => setBrightness(parseFloat(e.target.value))}
                             className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                         />
+                    </div>
+
+                    {/* Primary Action Button (Section Style / Large) */}
+                    <div className="flex justify-center mt-4 p-4">
+                        <button
+                            className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 cursor-pointer transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900 active:scale-95 group relative transform-gpu will-change-transform [backface-visibility:hidden]"
+                            title="На макет"
+                        >
+                            <Shirt className="w-7 h-7 transform-gpu will-change-transform" strokeWidth={2} />
+                        </button>
                     </div>
                 </section>
             </aside >
