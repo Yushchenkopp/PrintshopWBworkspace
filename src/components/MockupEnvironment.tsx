@@ -11,6 +11,7 @@ interface MockupEnvironmentProps {
     onClose: () => void;
     isOpen: boolean;
     onPrintCountChange: (count: number) => void;
+    initialFrontPrint?: string | null;
 }
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
@@ -26,7 +27,7 @@ const SIZE_DIMENSIONS: Record<string, { width: number; height: number }> = {
 };
 
 
-export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, isOpen, onPrintCountChange }) => {
+export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, isOpen, onPrintCountChange, initialFrontPrint }) => {
     const [shirtColor, setShirtColor] = useState<'white' | 'black'>('white');
     const [selectedSize, setSelectedSize] = useState('M');
     // Coordinates fixed by user request
@@ -51,6 +52,19 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
         const count = (frontPrint ? 1 : 0) + (backPrint ? 1 : 0);
         onPrintCountChange(count);
     }, [frontPrint, backPrint, onPrintCountChange]);
+
+    // Sync initialFrontPrint to state when it changes
+    React.useEffect(() => {
+        if (initialFrontPrint) {
+            setFrontPrint(initialFrontPrint);
+            // Reset position/scale if needed, or keep previous settings?
+            // Usually if a new print comes in, we might want to reset or keep.
+            // Let's reset X offset to 0 (center) to be safe, but keep size/Y if reasonable?
+            // User requested "load it into the preview card... as if user did it".
+            // So treating it like a fresh upload is safest.
+            setFrontPrintX(0);
+        }
+    }, [initialFrontPrint]);
 
 
     // Print Area Calibration State

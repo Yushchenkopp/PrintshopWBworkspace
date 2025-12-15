@@ -13,6 +13,12 @@ function App() {
   const [template, setTemplate] = useState<TemplateType>('collage');
   const [showMockup, setShowMockup] = useState(false);
   const [mockupCount, setMockupCount] = useState(0);
+  const [initialPrintData, setInitialPrintData] = useState<string | null>(null);
+
+  const handleTransferToMockup = (printData: string) => {
+    setInitialPrintData(printData);
+    setShowMockup(true);
+  };
 
   const handleSwitchTemplate = (newTemplate: TemplateType) => {
     setTemplate(newTemplate);
@@ -30,6 +36,7 @@ function App() {
         isOpen={showMockup}
         onClose={() => setShowMockup(false)}
         onPrintCountChange={setMockupCount}
+        initialFrontPrint={initialPrintData}
       />
 
       {template === 'collage' && (
@@ -52,6 +59,7 @@ function App() {
         <PapaWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          onTransferToMockup={handleTransferToMockup}
           mockupPrintCount={mockupCount}
         />
       )}

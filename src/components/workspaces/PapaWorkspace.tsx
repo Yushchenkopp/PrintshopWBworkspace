@@ -4,7 +4,7 @@ import { type TemplateType } from '../../utils/TemplateGenerators';
 import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, ImagePlus, Trash2, Sun, Plus, Shirt } from 'lucide-react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import heic2any from 'heic2any';
-import { exportHighRes } from '../../utils/ExportUtils';
+import { exportHighRes, generateHighResBlob } from '../../utils/ExportUtils';
 import { CanvasEditor } from '../CanvasEditor';
 import {
     DndContext,
@@ -26,6 +26,7 @@ import { SortablePhoto } from '../SortablePhoto';
 interface PapaWorkspaceProps {
     onSwitchTemplate: (template: TemplateType) => void;
     onOpenMockup: () => void;
+    onTransferToMockup?: (printData: string) => void;
     mockupPrintCount?: number;
 }
 
@@ -46,7 +47,7 @@ const PATH_A_MAMA_2 = "M7466.54 1436.61 L6864.35 1436.61 L6777.86 1720.09 L6235.
 const PAPA_PATHS = [PATH_P1, PATH_A1, PATH_P2, PATH_A2];
 const MAMA_PATHS = [PATH_M1, PATH_A_MAMA_1, PATH_M2, PATH_A_MAMA_2];
 
-export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, mockupPrintCount }) => {
+export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, onTransferToMockup, mockupPrintCount }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [parent] = useAutoAnimate();
     const [images, setImages] = useState<({ id: string; url: string } | null)[]>([null, null, null, null]);
@@ -410,6 +411,21 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
         setImages([null, null, null, null]);
     };
 
+    const handleToMockup = async () => {
+        if (!canvas || !onTransferToMockup) return;
+
+        // Show loading state if possible? (Simulated by UI delay or spinner if needed)
+        // Ideally we should have a loading state for this button.
+
+        const blob = await generateHighResBlob(canvas);
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            onTransferToMockup(url);
+        } else {
+            alert("Не удалось создать макет.");
+        }
+    };
+
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (active.id !== over?.id) {
@@ -590,6 +606,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                 <div className="pt-6 border-t border-zinc-200/50 mt-auto">
                     <div className="grid grid-cols-2 gap-3">
                         <button
+                            onClick={handleToMockup}
                             className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                         >
                             <Shirt className="w-4 h-4" />

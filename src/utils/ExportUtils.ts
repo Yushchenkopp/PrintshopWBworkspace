@@ -143,8 +143,8 @@ const trimTransparency = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
     return trimmed;
 };
 
-export const exportHighRes = async (canvas: fabric.Canvas) => {
-    if (!canvas) return;
+export const generateHighResBlob = async (canvas: fabric.Canvas): Promise<Blob | null> => {
+    if (!canvas) return null;
 
     try {
         // 1. Save current state
@@ -163,10 +163,10 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
         const objects = canvas.getObjects();
 
         if (objects.length === 0) {
-            alert("Холст пуст.");
+            // alert("Холст пуст."); // No alert in generator, handle in caller if needed
             canvas.setViewportTransform(originalViewport || [1, 0, 0, 1, 0, 0]);
             canvas.requestRenderAll();
-            return;
+            return null;
         }
 
         objects.forEach(obj => {
@@ -240,6 +240,22 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
         // 9. Inject DPI Metadata
         blob = await setDpi(blob, 200);
 
+        return blob;
+
+    } catch (error) {
+        console.error("Blob generation failed:", error);
+        return null;
+    }
+};
+
+export const exportHighRes = async (canvas: fabric.Canvas) => {
+    const blob = await generateHighResBlob(canvas);
+    if (!blob) {
+        alert("Не удалось сохранить файл. Попробуйте еще раз.");
+        return;
+    }
+
+    try {
         // 10. Download
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -250,10 +266,9 @@ export const exportHighRes = async (canvas: fabric.Canvas) => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-
     } catch (error) {
-        console.error("Export failed:", error);
-        alert("Не удалось сохранить файл. Попробуйте еще раз.");
+        console.error("Export download failed:", error);
+        alert("Ошибка при скачивании файла.");
     }
 };
 
