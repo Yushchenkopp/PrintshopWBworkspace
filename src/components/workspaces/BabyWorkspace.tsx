@@ -272,9 +272,10 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                     } else if (isFilterChanged) {
                         // Filter Update Only
                         updateCollageFilters(canvas, isBWEnabled, brightness);
+
                     } else {
                         // Smart Update (Text Only + Signature)
-                        const newHeight = updateBabyHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled, scaleX, signatureScale);
+                        const newHeight = updateBabyHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled, scaleX, signatureScale, scaleY);
                         // Update logical height if changed (e.g. signature added/removed or resized)
                         if (newHeight && newHeight !== logicalCanvasHeight) {
                             setLogicalCanvasHeight(newHeight);

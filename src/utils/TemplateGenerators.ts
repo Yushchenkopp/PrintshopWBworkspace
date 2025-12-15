@@ -568,25 +568,31 @@ export const updateCollageHeader = (
         }
     });
 
+
     // 2. UPDATE FOOTER NAME
     const footerName = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
-    if (!footerTextValue) {
-        footerName.set({ text: '', visible: false, height: 0 }); // Hide
-    } else {
-        // If previously hidden, we might need to reset visibility
-        footerName.set({ visible: true });
+    if (footerName) {
+        // Update Color Always
+        footerName.set({ fill: textColor });
 
-        if (footerName.text !== footerTextValue) { // Only update if changed
-            footerName.set({ text: footerTextValue });
+        if (!footerTextValue) {
+            footerName.set({ text: '', visible: false, height: 0 }); // Hide
+        } else {
+            // If previously hidden, we might need to reset visibility
+            footerName.set({ visible: true });
 
-            // Reset scale to 1 before checking width
-            footerName.set({ scaleX: 1, scaleY: 1 });
+            if (footerName.text !== footerTextValue) { // Only update if changed
+                footerName.set({ text: footerTextValue });
 
-            // Auto-scale Name (max 55% width)
-            const maxNameWidth = CONTENT_WIDTH * 0.55;
-            if (footerName.width! > maxNameWidth) {
-                const scale = maxNameWidth / footerName.width!;
-                footerName.set({ scaleX: scale, scaleY: scale });
+                // Reset scale to 1 before checking width
+                footerName.set({ scaleX: 1, scaleY: 1 });
+
+                // Auto-scale Name (max 55% width)
+                const maxNameWidth = CONTENT_WIDTH * 0.55;
+                if (footerName.width! > maxNameWidth) {
+                    const scale = maxNameWidth / footerName.width!;
+                    footerName.set({ scaleX: scale, scaleY: scale });
+                }
             }
         }
     }
@@ -1205,6 +1211,7 @@ export const generateBabyTemplate = async (
     return totalHeight;
 };
 
+
 // --- UPDATE HEADER ONLY (Smart Update) ---
 export const updateBabyHeader = (
     canvas: any,
@@ -1217,7 +1224,8 @@ export const updateBabyHeader = (
     signatureTextValue: string,
     isSignatureEnabled: boolean,
     cropScaleX: number = 1,
-    signatureScale: number = 1 // New Scale
+    signatureScale: number = 1, // New Scale,
+    cropScaleY: number = 1 // New Param
 ) => {
     if (!canvas) return;
 
@@ -1294,23 +1302,25 @@ export const updateBabyHeader = (
     // 3. UPDATE SIGNATURE
     const signature = canvas.getObjects().find((obj: any) => obj.name === 'footer-signature');
 
+    // Find Footer Name Position for Anchor
+    const footerNameObj = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
+
+    // Fallback if footer disabled: Calculate bottom of content from Image
+    let footerTop = canvas.height - 100; // Safe default
+    const imgObj: any = canvas.getObjects().find((o: any) => o.type === 'image');
+
+    if (imgObj && imgObj.baseCellTop !== undefined && imgObj.baseClipHeight !== undefined) {
+        const contentBottom = imgObj.baseCellTop + (imgObj.baseClipHeight * cropScaleY);
+        footerTop = contentBottom + (15 * SCALE_FACTOR); // Margin
+    } else if (footerNameObj) {
+        footerTop = footerNameObj.top!;
+    }
+
     if (isSignatureEnabled) {
         const baseFontSize = 28 * SCALE_FACTOR;
         const signatureWidth = CONTENT_WIDTH * 0.5;
 
         // Position Calculation
-        // Position:
-        // If Name is visible: beneath Name
-        // If Name is hidden: at Name's position + OFFSET
-        // Recalculate these based on current state
-
-        // Find Grid Bottom (Estimate based on content?)
-        // Better: Find footer-name top - margin
-        // Or finding existing barcode/name top.
-        const footerNameObj = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
-        const footerTop = footerNameObj ? footerNameObj.top : (canvas.height - 100); // Fallback
-
-        // Name Height
         const nameH = (footerNameObj && footerNameObj.visible) ? (footerNameObj.height! * footerNameObj.scaleY!) : 0;
 
         let signatureTop = footerTop;
@@ -1368,6 +1378,19 @@ export const updateBabyHeader = (
             const scale = targetDateWidth / footerDate.width;
             footerDate.set({ scaleX: scale, scaleY: scale });
         }
+        // Sync Top (if footerTop changed due to dynamic crop)
+        // Actually, updateBabyHeader relies on existing positions usually, but if crop changed, footer moves.
+        // We really should update all footer positions if crop changed.
+        // But for "Smart Update", crop usually doesn't change?
+        // Wait, BabyWorkspace passes current scaleX.
+        // If scaleX/Y changed, we should assume positions need update.
+        // But updateBabyHeader is mainly for TEXT.
+        // If geometry changes, BabyWorkspace calls updateImageGeometry!
+        // So updateBabyHeader receives current scale just for width calculations.
+        // However, user bug is Translit toggle causing crop.
+        // Translit DOES NOT change geometry.
+        // So footerTop shouldn't change unless we rely on image height?
+        // Ah, if we fall back to footerTop based on image, it's fine.
     }
 
     // 5. UPDATE BARCODE
@@ -1380,11 +1403,22 @@ export const updateBabyHeader = (
 
     // 6. RECALCULATE HEIGHT
     // Calculate total height to include dynamic elements
-    let totalHeight = dateTop + (30 * SCALE_FACTOR) + (40 * SCALE_FACTOR); // Base height from Date (approx)
+    let totalHeight = 0;
 
-    // Better: Find date bottom
+    // A. If Footer Exists
     if (footerDate) {
         totalHeight = footerDate.top! + (footerDate.height! * footerDate.scaleY!) + (40 * SCALE_FACTOR);
+    }
+    // B. If Footer Missing (Disabled) - Use Image Bottom
+    else {
+        // Find visible bottom of image
+        if (imgObj && imgObj.baseCellTop !== undefined && imgObj.baseClipHeight !== undefined) {
+            const contentBottom = imgObj.baseCellTop + (imgObj.baseClipHeight * cropScaleY);
+            totalHeight = contentBottom + PADDING_SIDE;
+        } else {
+            // Absolute fallback
+            totalHeight = 800 * SCALE_FACTOR;
+        }
     }
 
     // Check if signature extends lower
