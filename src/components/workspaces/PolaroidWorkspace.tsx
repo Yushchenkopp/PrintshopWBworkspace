@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Sun, Shirt } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Sun, Shirt, Check, Loader2 } from 'lucide-react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
 import {
@@ -21,11 +22,12 @@ import {
     rectSortingStrategy
 } from '@dnd-kit/sortable';
 import { SortablePhoto } from '../SortablePhoto';
-import { exportHighRes } from '../../utils/ExportUtils';
+import { exportHighRes, generateHighResBlob } from '../../utils/ExportUtils';
 
 interface PolaroidWorkspaceProps {
     onSwitchTemplate: (template: TemplateType) => void;
     onOpenMockup: () => void;
+    onTransferToMockup?: (printData: string) => void;
     mockupPrintCount?: number;
 }
 
@@ -42,7 +44,7 @@ const SLOTS = [
     { x: 652, y: 24, w: 533, h: 472 }
 ];
 
-export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, mockupPrintCount }) => {
+export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, onTransferToMockup, mockupPrintCount }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [parent] = useAutoAnimate();
     // Fixed 2 slots for Polaroid: [Left, Right]
@@ -52,6 +54,8 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
     const [textVariant, setTextVariant] = useState<'wife' | 'husband'>('wife');
     const [brightness, setBrightness] = useState<number>(0);
+    const [isTransferring, setIsTransferring] = useState(false);
+    const [isTransferSuccess, setIsTransferSuccess] = useState(false);
 
     // We only need 2 images for Polaroid, but we keep the list flexible for the sidebar
     // However, the canvas will only display the first 2.
@@ -60,8 +64,31 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
         setCanvas(c);
         // Transparent background for "floating" effect
         c.backgroundColor = 'transparent';
+        c.backgroundColor = 'transparent';
         c.renderAll();
     }, []);
+
+    const handleToMockup = async () => {
+        if (!canvas || !onTransferToMockup || isTransferring) return;
+
+        setIsTransferring(true);
+        setIsTransferSuccess(false);
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const blob = await generateHighResBlob(canvas);
+
+        setIsTransferring(false);
+
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            onTransferToMockup(url);
+            setIsTransferSuccess(true);
+            setTimeout(() => setIsTransferSuccess(false), 2000);
+        } else {
+            alert("Не удалось создать макет.");
+        }
+    };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetSlotIndex?: number) => {
         if (e.target.files) {
@@ -669,10 +696,54 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 <div className="pt-6 border-t border-zinc-200/50 mt-auto">
                     <div className="grid grid-cols-2 gap-3">
                         <button
-                            className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                            onClick={handleToMockup}
+                            disabled={isTransferring}
+                            className={`h-12 border rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden
+                                ${isTransferSuccess
+                                    ? 'bg-zinc-900 border-zinc-900 text-white'
+                                    : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:shadow-md hover:-translate-y-0.5 active:scale-95'
+                                }
+                            `}
                         >
-                            <Shirt className="w-4 h-4" />
-                            На макет
+                            <AnimatePresence mode="wait" initial={false}>
+                                {isTransferring ? (
+                                    <motion.div
+                                        key="loading"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                                        <span className="text-zinc-400 font-medium">Создание...</span>
+                                    </motion.div>
+                                ) : isTransferSuccess ? (
+                                    <motion.div
+                                        key="success"
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.5 }} // Exit scale down cleanly
+                                        transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        <span>Готово</span>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key="idle"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Shirt className="w-4 h-4" />
+                                        <span>На макет</span>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </button>
                         <button
                             onClick={() => canvas && exportHighRes(canvas)}
@@ -693,7 +764,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         title="Перейти к макету"
                     >
                         <Shirt className="w-6 h-6 text-zinc-700 group-hover:text-zinc-900 transition-colors" opacity={0.8} strokeWidth={1.5} />
-                        <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-zinc-900 text-white text-xs font-bold flex items-center justify-center rounded-full shadow-md border-2 border-white transform scale-100 group-hover:scale-110 transition-transform">
+                        <div key={mockupPrintCount} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-zinc-900 text-white text-xs font-bold flex items-center justify-center rounded-full shadow-md border-2 border-white transform scale-100 group-hover:scale-110 transition-transform animate-[bounce_0.5s_ease-out]">
                             {mockupPrintCount || 0}
                         </div>
                     </button>

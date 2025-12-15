@@ -3,8 +3,9 @@ import { CanvasEditor } from '../CanvasEditor';
 import { generateCollageTemplate, updateCollageHeader, updateCollageFilters } from '../../utils/TemplateGenerators';
 import type { TemplateType } from '../../utils/TemplateGenerators';
 import { transliterate } from '../../utils/Transliteration';
-import { exportHighRes } from '../../utils/ExportUtils';
-import { Trash2, ImagePlus, ArrowDownToLine, Sun, Type, User, Calendar, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Shirt } from 'lucide-react';
+import { exportHighRes, generateHighResBlob } from '../../utils/ExportUtils';
+import { Trash2, ImagePlus, ArrowDownToLine, Sun, Type, User, Calendar, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Shirt, Check, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import * as fabric from 'fabric';
 import heic2any from 'heic2any';
 import {
@@ -30,10 +31,11 @@ import { SortablePhoto } from '../SortablePhoto';
 interface CollageWorkspaceProps {
     onSwitchTemplate: (template: TemplateType) => void;
     onOpenMockup: () => void;
+    onTransferToMockup?: (printData: string) => void;
     mockupPrintCount?: number;
 }
 
-export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, mockupPrintCount }) => {
+export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, onTransferToMockup, mockupPrintCount }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [parent] = useAutoAnimate();
     const [images, setImages] = useState<{ id: string; url: string }[]>([]);
@@ -53,6 +55,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const [isBorderEnabled, setIsBorderEnabled] = useState<boolean>(false); // Canvas State (Delayed)
     const [visualBorderEnabled, setVisualBorderEnabled] = useState<boolean>(false); // UI State (Instant)
     const [signatureScale, setSignatureScale] = useState<number>(1);
+    const [isTransferring, setIsTransferring] = useState(false);
+    const [isTransferSuccess, setIsTransferSuccess] = useState(false);
 
     // Debounce signature text
     const [debouncedSignatureText, setDebouncedSignatureText] = useState<string>('WANNA BE YOURS');
@@ -103,6 +107,28 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const handleCanvasReady = useCallback((c: fabric.Canvas) => {
         setCanvas(c);
     }, []);
+
+    const handleToMockup = async () => {
+        if (!canvas || !onTransferToMockup || isTransferring) return;
+
+        setIsTransferring(true);
+        setIsTransferSuccess(false);
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const blob = await generateHighResBlob(canvas);
+
+        setIsTransferring(false);
+
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            onTransferToMockup(url);
+            setIsTransferSuccess(true);
+            setTimeout(() => setIsTransferSuccess(false), 2000);
+        } else {
+            alert("Не удалось создать макет.");
+        }
+    };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -576,10 +602,54 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                 <div className="pt-6 border-t border-zinc-200/50 mt-auto">
                     <div className="grid grid-cols-2 gap-3">
                         <button
-                            className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                            onClick={handleToMockup}
+                            disabled={isTransferring}
+                            className={`h-12 border rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden
+                                ${isTransferSuccess
+                                    ? 'bg-zinc-900 border-zinc-900 text-white'
+                                    : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:shadow-md hover:-translate-y-0.5 active:scale-95'
+                                }
+                            `}
                         >
-                            <Shirt className="w-4 h-4" />
-                            На макет
+                            <AnimatePresence mode="wait" initial={false}>
+                                {isTransferring ? (
+                                    <motion.div
+                                        key="loading"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                                        <span className="text-zinc-400 font-medium">Создание...</span>
+                                    </motion.div>
+                                ) : isTransferSuccess ? (
+                                    <motion.div
+                                        key="success"
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.5 }} // Exit scale down cleanly
+                                        transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        <span>Готово</span>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key="idle"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Shirt className="w-4 h-4" />
+                                        <span>На макет</span>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </button>
                         <button
                             onClick={() => canvas && exportHighRes(canvas)}
@@ -599,7 +669,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         title="Перейти к макету"
                     >
                         <Shirt className="w-6 h-6 text-zinc-700 group-hover:text-zinc-900 transition-colors" opacity={0.8} strokeWidth={1.5} />
-                        <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-zinc-900 text-white text-xs font-bold flex items-center justify-center rounded-full shadow-md border-2 border-white transform scale-100 group-hover:scale-110 transition-transform">
+                        <div key={mockupPrintCount} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-zinc-900 text-white text-xs font-bold flex items-center justify-center rounded-full shadow-md border-2 border-white transform scale-100 group-hover:scale-110 transition-transform animate-[bounce_0.5s_ease-out]">
                             {mockupPrintCount || 0}
                         </div>
                     </button>

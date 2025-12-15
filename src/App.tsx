@@ -17,7 +17,7 @@ function App() {
 
   const handleTransferToMockup = (printData: string) => {
     setInitialPrintData(printData);
-    setShowMockup(true);
+    // Silent update: Do not open mockup immediately
   };
 
   const handleSwitchTemplate = (newTemplate: TemplateType) => {
@@ -43,6 +43,7 @@ function App() {
         <CollageWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          onTransferToMockup={handleTransferToMockup}
           mockupPrintCount={mockupCount}
         />
       )}
@@ -51,6 +52,7 @@ function App() {
         <PolaroidWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          onTransferToMockup={handleTransferToMockup}
           mockupPrintCount={mockupCount}
         />
       )}
@@ -68,6 +70,7 @@ function App() {
         <JerseyWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          onTransferToMockup={handleTransferToMockup}
           mockupPrintCount={mockupCount}
         />
       )}
@@ -76,6 +79,7 @@ function App() {
         <BabyWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          onTransferToMockup={handleTransferToMockup}
           mockupPrintCount={mockupCount}
         />
       )}
