@@ -12,6 +12,7 @@ function App() {
   console.log("App mounting");
   const [template, setTemplate] = useState<TemplateType>('collage');
   const [showMockup, setShowMockup] = useState(false);
+  const [mockupCount, setMockupCount] = useState(0);
 
   const handleSwitchTemplate = (newTemplate: TemplateType) => {
     setTemplate(newTemplate);
@@ -24,12 +25,18 @@ function App() {
       </div>
 
       {/* --- MOCKUP ENVIRONMENT (OVERLAY) --- */}
-      {showMockup && <MockupEnvironment onClose={() => setShowMockup(false)} />}
+      {/* --- MOCKUP ENVIRONMENT (PERSISTENT) --- */}
+      <MockupEnvironment
+        isOpen={showMockup}
+        onClose={() => setShowMockup(false)}
+        onPrintCountChange={setMockupCount}
+      />
 
       {template === 'collage' && (
         <CollageWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          mockupPrintCount={mockupCount}
         />
       )}
 
@@ -37,6 +44,7 @@ function App() {
         <PolaroidWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          mockupPrintCount={mockupCount}
         />
       )}
 
@@ -44,6 +52,7 @@ function App() {
         <PapaWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          mockupPrintCount={mockupCount}
         />
       )}
 
@@ -51,6 +60,7 @@ function App() {
         <JerseyWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          mockupPrintCount={mockupCount}
         />
       )}
 
@@ -58,6 +68,7 @@ function App() {
         <BabyWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          mockupPrintCount={mockupCount}
         />
       )}
 
@@ -65,6 +76,7 @@ function App() {
         <ConstructorWorkspace
           onSwitchTemplate={handleSwitchTemplate}
           onOpenMockup={() => setShowMockup(true)}
+          mockupPrintCount={mockupCount}
         />
       )}
     </div>

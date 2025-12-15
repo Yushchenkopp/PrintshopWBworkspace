@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Download, ArrowLeft, ImagePlus, Trash2, Copy, Loader2 } from 'lucide-react';
+import { Download, ArrowLeft, ImagePlus, Trash2, Copy, Loader2, Maximize, ArrowUpDown, ArrowLeftRight } from 'lucide-react';
 import { downloadPrintImage } from '../utils/ExportUtils';
 import { toCanvas } from 'html-to-image';
 import UPNG from 'upng-js';
@@ -9,6 +9,8 @@ import UPNG from 'upng-js';
 
 interface MockupEnvironmentProps {
     onClose: () => void;
+    isOpen: boolean;
+    onPrintCountChange: (count: number) => void;
 }
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
@@ -24,7 +26,7 @@ const SIZE_DIMENSIONS: Record<string, { width: number; height: number }> = {
 };
 
 
-export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose }) => {
+export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, isOpen, onPrintCountChange }) => {
     const [shirtColor, setShirtColor] = useState<'white' | 'black'>('white');
     const [selectedSize, setSelectedSize] = useState('M');
     // Coordinates fixed by user request
@@ -34,15 +36,21 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
     const [frontPrint, setFrontPrint] = useState<string | null>(null);
     const [frontPrintSize, setFrontPrintSize] = useState(1);
     const [frontPrintY, setFrontPrintY] = useState(2); // Starts at 2cm
+    const [frontPrintX, setFrontPrintX] = useState(0); // Starts at center (0cm)
     const [imgAspectRatio, setImgAspectRatio] = useState(30 / 42); // Default to full fit
 
     // Back Print State
     const [backPrint, setBackPrint] = useState<string | null>(null);
     const [backPrintSize, setBackPrintSize] = useState(1);
     const [backPrintY, setBackPrintY] = useState(9); // Starts at 9cm
+    const [backPrintX, setBackPrintX] = useState(0); // Starts at center (0cm)
     const [backImgAspectRatio, setBackImgAspectRatio] = useState(30 / 42);
 
-
+    // Report Count
+    React.useEffect(() => {
+        const count = (frontPrint ? 1 : 0) + (backPrint ? 1 : 0);
+        onPrintCountChange(count);
+    }, [frontPrint, backPrint, onPrintCountChange]);
 
 
     // Print Area Calibration State
@@ -133,11 +141,18 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
             : ZONE_HEIGHT_CM;
 
         const newPrintHeight = newBaseHeight * newSize;
+        // const newPrintWidth = newPrintHeight * imgAspectRatio; // Not used for Y clamping
+
         const newMaxOffset = MIN_OFFSET_CM + (ZONE_HEIGHT_CM - newPrintHeight) - 0.1;
 
         if (frontPrintY > newMaxOffset) {
             setFrontPrintY(Math.min(frontPrintY, newMaxOffset));
         }
+        // No need to clamp X state, as it is now percentage (-100 to 100) relative to available space.
+    };
+
+    const handleFrontXChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFrontPrintX(parseFloat(e.target.value));
     };
 
     const handleBackPrintUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,11 +178,18 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
             : ZONE_HEIGHT_CM;
 
         const newPrintHeight = newBaseHeight * newSize;
+        // const newPrintWidth = newPrintHeight * backImgAspectRatio; // Not used for Y clamping
+
         const newMaxOffset = MIN_BACK_OFFSET_CM + (ZONE_HEIGHT_CM - newPrintHeight) - 0.1;
 
         if (backPrintY > newMaxOffset) {
             setBackPrintY(newMaxOffset);
         }
+        // X state is percentage (-100 to 100), self-adjusts.
+    };
+
+    const handleBackXChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setBackPrintX(parseFloat(e.target.value));
     };
 
 
@@ -482,616 +504,691 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose })
         }
     };
 
+
+
     return createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center animate-in fade-in duration-300">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={onClose}
-            />
-
-            {/* Modal Window */}
-            <div className="relative w-[95vw] h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-200">
-                {/* SVG Filter Definition for Fabric Texture */}
-
-
-
-
-                {/* --- FULL BACKGROUND: Image Preview --- */}
-                <div
-                    ref={previewRef}
-                    className="absolute inset-0 bg-[#e4e4e7]"
-                >
-                    {/* SVG Filter Definition (Moved inside for export capture) */}
-                    <svg className="absolute w-0 h-0 pointer-events-none">
-                        <filter id="fabric-texture">
-                            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
-                            <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
-                            <feComposite operator="in" in="coloredNoise" in2="SourceAlpha" result="grain" />
-                            <feBlend mode="multiply" in="grain" in2="SourceGraphic" />
-                        </filter>
-                    </svg>
-
-                    <AnimatePresence mode="popLayout">
-                        <motion.img
-                            key={shirtColor}
-                            src={`/mockup/mockup-${shirtColor}-full.webp`}
-                            alt="T-Shirt Mockup"
-                            crossOrigin="anonymous"
-                            initial={{ opacity: 0, scale: 1.05 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.5, ease: "easeInOut" }}
-                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                        />
-                    </AnimatePresence>
-
-                    {/* Front Print Layer (Dynamic Area + Debug Overlay) */}
-                    <div
-                        className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
-                        style={{
-                            top: `${printArea.top}%`,
-                            left: `${printArea.left}%`,
-                            width: `${printArea.width}%`,
-                            height: `${printArea.height}%`,
-                            border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
-                            backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
-                        }}
-                    >
-
-
-                        <AnimatePresence>
-                            {frontPrint && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: frontPrintSize }}
-                                    exit={{ opacity: 0, scale: 0.8 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="absolute flex items-start justify-center w-full h-full origin-top"
-                                    style={{
-                                        top: `${((frontPrintY - MIN_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
-                                    }}
-                                >
-                                    <img
-                                        src={frontPrint}
-                                        alt="Print"
-                                        className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
-                                        style={{
-                                            maxHeight: '100%',
-                                            maxWidth: '100%',
-                                            filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
-                                        }}
-                                        onLoad={(e) => {
-
-                                            const img = e.currentTarget;
-                                            setImgAspectRatio(img.naturalWidth / img.naturalHeight);
-                                        }}
-
-                                    />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
-                    {/* Back Print Layer (Dynamic Area + Debug Overlay) */}
-                    <div
-                        className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
-                        style={{
-                            top: `${backPrintArea.top}%`,
-                            left: `${backPrintArea.left}%`,
-                            width: `${backPrintArea.width}%`,
-                            height: `${backPrintArea.height}%`,
-                            border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
-                            backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
-                        }}
-                    >
-
-
-                        <AnimatePresence>
-                            {backPrint && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: backPrintSize }}
-                                    exit={{ opacity: 0, scale: 0.8 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="absolute flex items-start justify-center w-full h-full origin-top"
-                                    style={{
-                                        top: `${((backPrintY - MIN_BACK_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
-                                    }}
-                                >
-                                    <img
-                                        src={backPrint}
-                                        alt="Back Print"
-                                        className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
-                                        style={{
-                                            maxHeight: '100%',
-                                            maxWidth: '100%',
-                                            filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
-                                        }}
-                                        onLoad={(e) => {
-
-                                            const img = e.currentTarget;
-                                            setBackImgAspectRatio(img.naturalWidth / img.naturalHeight);
-                                        }}
-                                    />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
-
-                    {/* Back Button (Top-Left) */}
-                    <button
+        <AnimatePresence mode="wait">
+            {isOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center">
+                    {/* Backdrop */}
+                    <motion.div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                         onClick={onClose}
-                        className="absolute top-8 left-8 w-12 h-12 flex items-center justify-center rounded-2xl bg-white/60 backdrop-blur-xl border transition-all duration-300 hover:bg-white hover:scale-105 active:scale-95 group z-50 cursor-pointer shadow-lg hover:shadow-xl"
-                        style={{
-                            borderColor: 'rgba(255, 255, 255, 0.7) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.7)',
-                            boxShadow: '0 8px 32px -4px rgba(0, 0, 0, 0.1)'
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                    />
+
+                    {/* Modal Window */}
+                    <motion.div
+                        className="relative w-[95vw] h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200"
+                        initial={{
+                            opacity: 0,
+                            scale: 0.92,
+                            x: 40,
+                            y: -40,
+                            filter: 'blur(20px)'
+                        }}
+                        animate={{
+                            opacity: 1,
+                            scale: 1,
+                            x: 0,
+                            y: 0,
+                            filter: 'blur(0px)',
+                            transition: {
+                                type: "spring",
+                                damping: 32,
+                                stiffness: 350,
+                                mass: 1
+                            }
+                        }}
+                        exit={{
+                            opacity: 0,
+                            scale: 0.95,
+                            filter: 'blur(10px)',
+                            transition: { duration: 0.2, ease: "easeInOut" }
                         }}
                     >
-                        <ArrowLeft className="w-5 h-5 text-zinc-600 group-hover:text-zinc-900 transition-colors" strokeWidth={2.5} />
-                    </button>
+                        {/* SVG Filter Definition for Fabric Texture */}
 
-                    {/* Floating Size Indicator (Canvas 2) */}
-                    <div
-                        className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 flex items-center justify-center w-40 h-40"
-                        style={{
-                            left: `${pos.x}%`, // Uses fixed state
-                            top: `${pos.y}%`
-                        }}
-                    >
-                        <AnimatePresence mode="popLayout">
-                            <motion.span
-                                key={selectedSize}
-                                initial={{ opacity: 0, y: 30, filter: 'blur(12px)', scale: 0.9 }}
-                                animate={{ opacity: 0.3, y: 0, filter: 'blur(0px)', scale: 1 }}
-                                exit={{ opacity: 0, y: -30, filter: 'blur(12px)', scale: 1.1 }}
-                                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                className="absolute text-[6rem] leading-none font-black text-zinc-900 tracking-tighter font-sans antialiased select-none mix-blend-multiply"
-                            >
-                                {selectedSize}
-                            </motion.span>
-                        </AnimatePresence>
-                    </div>
 
-                    {/* Export Crop Overlay */}
-                    {isExportCalibration && (
+
+
+                        {/* --- FULL BACKGROUND: Image Preview --- */}
                         <div
-                            className="absolute pointer-events-none z-50 border-2 border-green-500 bg-green-500/10"
-                            style={{
-                                top: `${exportCrop.top}%`,
-                                left: `${exportCrop.left}%`,
-                                width: `${exportCrop.width}%`,
-                                height: `${exportCrop.height}%`
-                            }}
+                            ref={previewRef}
+                            className="absolute inset-0 bg-[#e4e4e7]"
                         >
-                            <div className="absolute top-0 left-0 bg-green-500 text-white text-[9px] px-1">
-                                Export Zone
-                            </div>
-                        </div>
-                    )}
-                </div>
+                            {/* SVG Filter Definition (Moved inside for export capture) */}
+                            <svg className="absolute w-0 h-0 pointer-events-none">
+                                <filter id="fabric-texture">
+                                    <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
+                                    <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
+                                    <feComposite operator="in" in="coloredNoise" in2="SourceAlpha" result="grain" />
+                                    <feBlend mode="multiply" in="grain" in2="SourceGraphic" />
+                                </filter>
+                            </svg>
 
-                {/* --- RIGHT FLOATING SIDEBAR --- */}
-                <aside
-                    className="absolute top-6 right-6 bottom-6 w-[400px] flex flex-col z-20 
+                            <AnimatePresence mode="popLayout">
+                                <motion.img
+                                    key={shirtColor}
+                                    src={`/mockup/mockup-${shirtColor}-full.webp`}
+                                    alt="T-Shirt Mockup"
+                                    crossOrigin="anonymous"
+                                    initial={{ opacity: 0, scale: 1.05 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                                />
+                            </AnimatePresence>
+
+                            {/* Front Print Layer (Dynamic Area + Debug Overlay) */}
+                            <div
+                                className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
+                                style={{
+                                    top: `${printArea.top}%`,
+                                    left: `${printArea.left}%`,
+                                    width: `${printArea.width}%`,
+                                    height: `${printArea.height}%`,
+                                    border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
+                                    backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
+                                }}
+                            >
+
+
+                                <AnimatePresence>
+                                    {frontPrint && (
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{
+                                                opacity: 1,
+                                                scale: frontPrintSize,
+                                                x: `${((frontPrintX / 100) * ((ZONE_WIDTH_CM - currentPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
+                                            }}
+                                            exit={{ opacity: 0, scale: 0.8 }}
+                                            transition={{ duration: 0.3 }}
+                                            className="absolute flex items-start justify-center w-full h-full origin-top"
+                                            style={{
+                                                top: `${((frontPrintY - MIN_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
+                                            }}
+                                        >
+                                            <img
+                                                src={frontPrint}
+                                                alt="Print"
+                                                className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
+                                                style={{
+                                                    maxHeight: '100%',
+                                                    maxWidth: '100%',
+                                                    filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
+                                                    // transform removed from here, moved to container
+                                                }}
+                                                onLoad={(e) => {
+                                                    const img = e.currentTarget;
+                                                    setImgAspectRatio(img.naturalWidth / img.naturalHeight);
+                                                    // Reset X on new load
+                                                    setFrontPrintX(0);
+                                                }}
+
+                                            />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {/* Back Print Layer (Dynamic Area + Debug Overlay) */}
+                            <div
+                                className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
+                                style={{
+                                    top: `${backPrintArea.top}%`,
+                                    left: `${backPrintArea.left}%`,
+                                    width: `${backPrintArea.width}%`,
+                                    height: `${backPrintArea.height}%`,
+                                    border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
+                                    backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
+                                }}
+                            >
+
+
+                                <AnimatePresence>
+                                    {backPrint && (
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{
+                                                opacity: 1,
+                                                scale: backPrintSize,
+                                                x: `${((backPrintX / 100) * ((ZONE_WIDTH_CM - currentBackPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
+                                            }}
+                                            exit={{ opacity: 0, scale: 0.8 }}
+                                            transition={{ duration: 0.3 }}
+                                            className="absolute flex items-start justify-center w-full h-full origin-top"
+                                            style={{
+                                                top: `${((backPrintY - MIN_BACK_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
+                                            }}
+                                        >
+                                            <img
+                                                src={backPrint}
+                                                alt="Back Print"
+                                                className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
+                                                style={{
+                                                    maxHeight: '100%',
+                                                    maxWidth: '100%',
+                                                    filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
+                                                }}
+                                                onLoad={(e) => {
+                                                    const img = e.currentTarget;
+                                                    setBackImgAspectRatio(img.naturalWidth / img.naturalHeight);
+                                                    setBackPrintX(0); // Reset X
+                                                }}
+                                            />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+
+                            {/* Back Button (Top-Left) */}
+                            <button
+                                onClick={onClose}
+                                className="absolute top-8 left-8 w-12 h-12 flex items-center justify-center rounded-2xl bg-white/60 backdrop-blur-xl border transition-all duration-300 hover:bg-white hover:scale-105 active:scale-95 group z-50 cursor-pointer shadow-lg hover:shadow-xl"
+                                style={{
+                                    borderColor: 'rgba(255, 255, 255, 0.7) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.7)',
+                                    boxShadow: '0 8px 32px -4px rgba(0, 0, 0, 0.1)'
+                                }}
+                            >
+                                <ArrowLeft className="w-5 h-5 text-zinc-600 group-hover:text-zinc-900 transition-colors" strokeWidth={2.5} />
+                            </button>
+
+                            {/* Floating Size Indicator (Canvas 2) */}
+                            <div
+                                className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 flex items-center justify-center w-40 h-40"
+                                style={{
+                                    left: `${pos.x}%`, // Uses fixed state
+                                    top: `${pos.y}%`
+                                }}
+                            >
+                                <AnimatePresence mode="popLayout">
+                                    <motion.span
+                                        key={selectedSize}
+                                        initial={{ opacity: 0, y: 30, filter: 'blur(12px)', scale: 0.9 }}
+                                        animate={{ opacity: 0.3, y: 0, filter: 'blur(0px)', scale: 1 }}
+                                        exit={{ opacity: 0, y: -30, filter: 'blur(12px)', scale: 1.1 }}
+                                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                                        className="absolute text-[6rem] leading-none font-black text-zinc-900 tracking-tighter font-sans antialiased select-none mix-blend-multiply"
+                                    >
+                                        {selectedSize}
+                                    </motion.span>
+                                </AnimatePresence>
+                            </div>
+
+                            {/* Export Crop Overlay */}
+                            {isExportCalibration && (
+                                <div
+                                    className="absolute pointer-events-none z-50 border-2 border-green-500 bg-green-500/10"
+                                    style={{
+                                        top: `${exportCrop.top}%`,
+                                        left: `${exportCrop.left}%`,
+                                        width: `${exportCrop.width}%`,
+                                        height: `${exportCrop.height}%`
+                                    }}
+                                >
+                                    <div className="absolute top-0 left-0 bg-green-500 text-white text-[9px] px-1">
+                                        Export Zone
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* --- RIGHT FLOATING SIDEBAR --- */}
+                        <aside
+                            className="absolute top-6 right-6 bottom-6 w-[400px] flex flex-col z-20 
                     bg-white/60 backdrop-blur-xl border rounded-3xl overflow-hidden
                     transition-all duration-300 ease-in-out"
-                    style={{
-                        borderColor: 'rgba(255, 255, 255, 0.7) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.7)',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-                    }}
-                >
-                    {/* SCROLLABLE CONTENT (Zones 1-3) */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
+                            style={{
+                                borderColor: 'rgba(255, 255, 255, 0.7) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.7)',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                            }}
+                        >
+                            {/* SCROLLABLE CONTENT (Zones 1-3) */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
 
 
-                        {/* HEADER */}
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-black text-zinc-900 tracking-tight">Макет</h2>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setIsDebug(!isDebug)}
-                                    className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isDebug ? 'bg-red-50 text-red-600 border-red-200' : 'bg-transparent text-zinc-300 border-zinc-100'}`}
-                                >
-                                    Limits
-                                </button>
-                                <button
-                                    onClick={() => setIsExportCalibration(!isExportCalibration)}
-                                    className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isExportCalibration ? 'bg-green-50 text-green-600 border-green-200' : 'bg-transparent text-zinc-300 border-zinc-100'}`}
-                                >
-                                    Export
-                                </button>
-                            </div>
-                        </div>
-
-
-                        {/* Calibration Controls */}
-                        {isDebug && (
-                            <div className="bg-red-50 p-3 rounded-xl border border-red-200 mt-2 space-y-3">
-                                <div className="text-[10px] font-bold text-red-600 uppercase mb-1">Front Zone</div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {(['top', 'left', 'width', 'height'] as const).map((prop) => (
-                                        <div key={`front-${prop}`} className="flex flex-col gap-1">
-                                            <label className="text-[9px] font-bold text-red-600 uppercase">{prop} (%)</label>
-                                            <input
-                                                type="number"
-                                                value={printArea[prop]}
-                                                onChange={(e) => setPrintArea(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
-                                                className="w-full rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-900 outline-none"
-                                                step="0.1"
-                                            />
-                                        </div>
-                                    ))}
+                                {/* HEADER */}
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-2xl font-black text-zinc-900 tracking-tight">Макет</h2>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setIsDebug(!isDebug)}
+                                            className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isDebug ? 'bg-red-50 text-red-600 border-red-200' : 'bg-transparent text-zinc-300 border-zinc-100'}`}
+                                        >
+                                            Limits
+                                        </button>
+                                        <button
+                                            onClick={() => setIsExportCalibration(!isExportCalibration)}
+                                            className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isExportCalibration ? 'bg-green-50 text-green-600 border-green-200' : 'bg-transparent text-zinc-300 border-zinc-100'}`}
+                                        >
+                                            Export
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="h-px bg-red-200/50" />
-                                <div className="text-[10px] font-bold text-red-600 uppercase mb-1">Back Zone</div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {(['top', 'left', 'width', 'height'] as const).map((prop) => (
-                                        <div key={`back-${prop}`} className="flex flex-col gap-1">
-                                            <label className="text-[9px] font-bold text-red-600 uppercase">{prop} (%)</label>
-                                            <input
-                                                type="number"
-                                                value={backPrintArea[prop]}
-                                                onChange={(e) => setBackPrintArea(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
-                                                className="w-full rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-900 outline-none"
-                                                step="0.1"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
-                        {isDebug && (
-                            <div className="bg-blue-50 p-3 rounded-xl border border-blue-200 mt-2 space-y-3">
-                                <div className="text-[10px] font-bold text-blue-600 uppercase mb-1">Size Label</div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {(['x', 'y'] as const).map((prop) => (
-                                        <div key={`size-${prop}`} className="flex flex-col gap-1">
-                                            <label className="text-[9px] font-bold text-blue-600 uppercase">{prop} (%)</label>
-                                            <input
-                                                type="number"
-                                                value={pos[prop]}
-                                                onChange={(e) => setPos(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
-                                                className="w-full rounded border border-blue-200 bg-white px-2 py-1 text-xs text-blue-900 outline-none"
-                                                step="0.01"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
-                        {isExportCalibration && (
-                            <div className="bg-green-50 p-3 rounded-xl border border-green-200 mt-2 grid grid-cols-2 gap-2">
-                                {['top', 'left', 'width', 'height'].map((prop) => (
-                                    <div key={prop} className="flex flex-col gap-1">
-                                        <label className="text-[9px] font-bold text-green-600 uppercase">{prop} (%)</label>
-                                        <input
-                                            type="number"
-                                            value={exportCrop[prop as keyof typeof exportCrop]}
-                                            onChange={(e) => setExportCrop(prev => ({ ...prev, [prop]: Number(e.target.value) }))}
-                                            className="w-full rounded border border-green-200 bg-white px-2 py-1 text-xs text-green-900 outline-none"
+                                {/* Calibration Controls */}
+                                {isDebug && (
+                                    <div className="bg-red-50 p-3 rounded-xl border border-red-200 mt-2 space-y-3">
+                                        <div className="text-[10px] font-bold text-red-600 uppercase mb-1">Front Zone</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(['top', 'left', 'width', 'height'] as const).map((prop) => (
+                                                <div key={`front-${prop}`} className="flex flex-col gap-1">
+                                                    <label className="text-[9px] font-bold text-red-600 uppercase">{prop} (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={printArea[prop]}
+                                                        onChange={(e) => setPrintArea(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
+                                                        className="w-full rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-900 outline-none"
+                                                        step="0.1"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="h-px bg-red-200/50" />
+                                        <div className="text-[10px] font-bold text-red-600 uppercase mb-1">Back Zone</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(['top', 'left', 'width', 'height'] as const).map((prop) => (
+                                                <div key={`back-${prop}`} className="flex flex-col gap-1">
+                                                    <label className="text-[9px] font-bold text-red-600 uppercase">{prop} (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={backPrintArea[prop]}
+                                                        onChange={(e) => setBackPrintArea(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
+                                                        className="w-full rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-900 outline-none"
+                                                        step="0.1"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isDebug && (
+                                    <div className="bg-blue-50 p-3 rounded-xl border border-blue-200 mt-2 space-y-3">
+                                        <div className="text-[10px] font-bold text-blue-600 uppercase mb-1">Size Label</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(['x', 'y'] as const).map((prop) => (
+                                                <div key={`size-${prop}`} className="flex flex-col gap-1">
+                                                    <label className="text-[9px] font-bold text-blue-600 uppercase">{prop} (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={pos[prop]}
+                                                        onChange={(e) => setPos(prev => ({ ...prev, [prop]: parseFloat(e.target.value) }))}
+                                                        className="w-full rounded border border-blue-200 bg-white px-2 py-1 text-xs text-blue-900 outline-none"
+                                                        step="0.01"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isExportCalibration && (
+                                    <div className="bg-green-50 p-3 rounded-xl border border-green-200 mt-2 grid grid-cols-2 gap-2">
+                                        {['top', 'left', 'width', 'height'].map((prop) => (
+                                            <div key={prop} className="flex flex-col gap-1">
+                                                <label className="text-[9px] font-bold text-green-600 uppercase">{prop} (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={exportCrop[prop as keyof typeof exportCrop]}
+                                                    onChange={(e) => setExportCrop(prev => ({ ...prev, [prop]: Number(e.target.value) }))}
+                                                    className="w-full rounded border border-green-200 bg-white px-2 py-1 text-xs text-green-900 outline-none"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* ZONE 1: PARAMETERS */}
+                                <section className="space-y-4">
+
+
+                                    {/* Color Swatches (Premium) */}
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShirtColor('white')}
+                                            className={`w-8 h-8 rounded-full border shadow-sm relative transition-all duration-300 ${shirtColor === 'white' ? 'border-zinc-300 ring-2 ring-zinc-900 ring-offset-2 scale-105' : 'border-zinc-200 hover:scale-110 hover:border-zinc-300'} bg-white`}
+                                            title="White"
+                                        />
+                                        <button
+                                            onClick={() => setShirtColor('black')}
+                                            className={`w-8 h-8 rounded-full border shadow-sm relative transition-all duration-300 ${shirtColor === 'black' ? 'border-zinc-600 ring-2 ring-zinc-900 ring-offset-2 scale-105' : 'border-zinc-700 hover:scale-110 hover:border-zinc-600'} bg-zinc-900`}
+                                            title="Black"
                                         />
                                     </div>
-                                ))}
-                            </div>
-                        )}
 
-                        {/* ZONE 1: PARAMETERS */}
-                        <section className="space-y-4">
+                                    {/* Size Selector (Sidebar Style) */}
+                                    <div>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {SIZES.map(size => (
+                                                <button
+                                                    key={size}
+                                                    onClick={() => setSelectedSize(size)}
+                                                    className={`h-10 flex items-center justify-center rounded-xl text-xs font-bold cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${selectedSize === size
+                                                        ? 'bg-zinc-900 text-white shadow-md'
+                                                        : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'
+                                                        }`}
+                                                >
+                                                    {size}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </section>
 
-
-                            {/* Color Swatches (Premium) */}
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShirtColor('white')}
-                                    className={`w-8 h-8 rounded-full border shadow-sm relative transition-all duration-300 ${shirtColor === 'white' ? 'border-zinc-300 ring-2 ring-zinc-900 ring-offset-2 scale-105' : 'border-zinc-200 hover:scale-110 hover:border-zinc-300'} bg-white`}
-                                    title="White"
-                                />
-                                <button
-                                    onClick={() => setShirtColor('black')}
-                                    className={`w-8 h-8 rounded-full border shadow-sm relative transition-all duration-300 ${shirtColor === 'black' ? 'border-zinc-600 ring-2 ring-zinc-900 ring-offset-2 scale-105' : 'border-zinc-700 hover:scale-110 hover:border-zinc-600'} bg-zinc-900`}
-                                    title="Black"
-                                />
-                            </div>
-
-                            {/* Size Selector (Sidebar Style) */}
-                            <div>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {SIZES.map(size => (
-                                        <button
-                                            key={size}
-                                            onClick={() => setSelectedSize(size)}
-                                            className={`h-10 flex items-center justify-center rounded-xl text-xs font-bold cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${selectedSize === size
-                                                ? 'bg-zinc-900 text-white shadow-md'
-                                                : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'
-                                                }`}
-                                        >
-                                            {size}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </section>
-
-                        <div className="h-px bg-zinc-100" />
+                                <div className="h-px bg-zinc-100" />
 
 
-                        {/* ZONE 2: FRONT PRINT */}
-                        <section className="space-y-4">
+                                {/* ZONE 2: FRONT PRINT */}
+                                <section className="space-y-4">
 
+                                    <div className="flex gap-4">
+                                        {/* Left Group: Card + Download */}
+                                        <div className="flex flex-col gap-3 items-center w-24 shrink-0">
 
-
-
-                            <div className="flex gap-6">
-                                {/* Left Group: Slider + Card */}
-                                <div className="flex gap-4 items-center">
-
-
-                                    {/* Preview Card */}
-                                    <div
-                                        className={`shrink-0 w-24 h-32 relative group transition-all duration-300 ${dragOverZone === 'front' ? 'scale-105' : ''}`}
-                                        onDragOver={(e) => handleDragOver(e, 'front')}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={(e) => handleDrop(e, 'front')}
-                                    >
-                                        {frontPrint ? (
+                                            {/* Preview Card */}
                                             <div
-                                                className={`w-full h-full rounded-2xl border overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300 bg-transparent
+                                                className={`w-24 h-32 relative group transition-all duration-300 ${dragOverZone === 'front' ? 'scale-105' : ''}`}
+                                                onDragOver={(e) => handleDragOver(e, 'front')}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleDrop(e, 'front')}
+                                            >
+                                                {frontPrint ? (
+                                                    <div
+                                                        className={`w-full h-full rounded-2xl border overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300 bg-transparent
                                                     ${dragOverZone === 'front' ? 'border-zinc-900 ring-2 ring-zinc-900/10' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-lg hover:-translate-y-0.5'}
                                                 `}
-                                                draggable="true"
-                                                onDragStart={(e) => handleDragStart(e, 'front')}
-                                            >
-                                                <img src={frontPrint} alt="Front Print" className="w-full h-full object-contain p-2 pointer-events-none" />
-                                                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={removeFrontPrint}
-                                                        className="p-1.5 bg-white/80 backdrop-blur rounded-full text-zinc-400 hover:text-red-500 hover:bg-white shadow-sm transition-all"
+                                                        draggable="true"
+                                                        onDragStart={(e) => handleDragStart(e, 'front')}
                                                     >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-
-
-                                            </div>
-
-
-
-                                        ) : (
-                                            <label
-                                                className={`w-full h-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 gap-2
+                                                        <img src={frontPrint} alt="Front Print" className="w-full h-full object-contain p-2 pointer-events-none" />
+                                                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={removeFrontPrint}
+                                                                className="p-1.5 bg-white/80 backdrop-blur rounded-full text-zinc-400 hover:text-red-500 hover:bg-white shadow-sm transition-all"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <label
+                                                        className={`w-full h-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 gap-2
                                                     ${dragOverZone === 'front' ? 'border-zinc-900 bg-zinc-50 scale-95 opacity-80' : 'border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50'}
                                                 `}
-                                            >
-
-                                                <input type="file" className="hidden" accept="image/*" onChange={handleFrontPrintUpload} />
-                                                <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 transition-colors">
-                                                    <ImagePlus className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600" />
-                                                </div>
-                                                <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-600 text-center leading-tight px-1">Загрузить<br />принт</span>
-                                            </label>
-                                        )}
-                                    </div>
-
-                                    {/* Vertical Offset Slider (CM) */}
-                                    <div className="h-32 w-4 flex items-center justify-center relative">
-                                        <input
-                                            type="range"
-                                            min={MIN_OFFSET_CM}
-                                            max={maxOffset}
-                                            step="0.5"
-                                            value={frontPrintY}
-                                            onChange={(e) => setFrontPrintY(Math.min(parseFloat(e.target.value), maxOffset))}
-                                            disabled={!frontPrint}
-
-                                            className={`absolute w-32 h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner rotate-90 origin-center [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                        />
-
-                                    </div>
-                                </div>
-
-                                {/* Right: Info & Controls */}
-                                <div className="flex-1 flex flex-col gap-3 justify-center">
-                                    {/* Info Grid (CM) */}
-                                    <div className="bg-[#F5F5F7] rounded-xl p-2 grid grid-cols-3 gap-1 text-center items-center">
-
-
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase">Ширина</span>
-                                            <span className="text-[10px] font-medium text-zinc-600">{(currentPrintWidth).toFixed(0)} см</span>
-                                        </div>
-                                        <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase">Высота</span>
-                                            <span className="text-[10px] font-medium text-zinc-600">{(currentPrintHeight).toFixed(0)} см</span>
-                                        </div>
-                                        <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase">Отступ</span>
-                                            <span className="text-[10px] font-medium text-zinc-600">{frontPrintY.toFixed(1)} см</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Horizontal Size Slider */}
-                                    <div className="space-y-1">
-                                        <input
-                                            type="range"
-                                            min="0.2"
-                                            max="1"
-                                            step="0.05"
-                                            value={frontPrintSize}
-                                            onChange={handleSizeChange}
-                                            disabled={!frontPrint}
-                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={() => frontPrint && downloadPrintImage(frontPrint, currentPrintWidth, currentPrintHeight)}
-                                        disabled={!frontPrint}
-                                        className={`w-full py-2 rounded-lg flex items-center justify-center transition-all ${frontPrint ? 'bg-white border border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm' : 'bg-transparent border border-zinc-100 text-zinc-300'}`}
-                                        title="Скачать принт"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                    </button>
-
-
-                                </div>
-                            </div>
-                        </section>
-
-                        <div className="h-px bg-zinc-100" />
-
-                        {/* ZONE 3: BACK PRINT */}
-                        <section className="space-y-4">
-
-
-
-
-                            <div className="flex gap-6">
-                                {/* Left Group: Slider + Card */}
-                                <div className="flex gap-4 items-center">
-
-
-                                    {/* Preview Card */}
-                                    <div
-                                        className={`shrink-0 w-24 h-32 relative group transition-all duration-300 ${dragOverZone === 'back' ? 'scale-105' : ''}`}
-                                        onDragOver={(e) => handleDragOver(e, 'back')}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={(e) => handleDrop(e, 'back')}
-                                    >
-                                        {backPrint ? (
-                                            <div
-                                                className={`w-full h-full rounded-2xl border overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300 bg-transparent
-                                                    ${dragOverZone === 'back' ? 'border-zinc-900 ring-2 ring-zinc-900/10' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-lg hover:-translate-y-0.5'}
-                                                `}
-                                                draggable="true"
-                                                onDragStart={(e) => handleDragStart(e, 'back')}
-                                            >
-                                                <img src={backPrint} alt="Back Print" className="w-full h-full object-contain p-2 pointer-events-none" />
-                                                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={removeBackPrint}
-                                                        className="p-1.5 bg-white/80 backdrop-blur rounded-full text-zinc-400 hover:text-red-500 hover:bg-white shadow-sm transition-all"
                                                     >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-
-
+                                                        <input type="file" className="hidden" accept="image/*" onChange={handleFrontPrintUpload} />
+                                                        <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 transition-colors">
+                                                            <ImagePlus className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600" />
+                                                        </div>
+                                                        <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-600 text-center leading-tight px-1">Загрузить<br />принт</span>
+                                                    </label>
+                                                )}
                                             </div>
 
+                                            {/* Download Button (Below Card) */}
+                                            <button
+                                                onClick={() => frontPrint && downloadPrintImage(frontPrint, currentPrintWidth, currentPrintHeight)}
+                                                disabled={!frontPrint}
+                                                className={`w-full py-2 rounded-lg flex items-center justify-center transition-all ${frontPrint ? 'bg-white border border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm' : 'bg-transparent border border-zinc-100 text-zinc-300'}`}
+                                                title="Скачать принт"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                            </button>
 
+                                        </div>
 
-                                        ) : (
-                                            <label
-                                                className={`w-full h-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 gap-2
+                                        {/* Right: Controls */}
+                                        <div className="flex-1 flex flex-col gap-4 justify-between">
+                                            {/* Info Grid (CM) */}
+                                            <div className="bg-[#F5F5F7] rounded-xl p-2 grid grid-cols-3 gap-1 text-center items-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Ширина</span>
+                                                    <span className="text-[10px] font-medium text-zinc-600">{(currentPrintWidth).toFixed(1)} см</span>
+                                                </div>
+                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Высота</span>
+                                                    <span className="text-[10px] font-medium text-zinc-600">{(currentPrintHeight).toFixed(1)} см</span>
+                                                </div>
+                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
+                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase">Отступ</span>
+                                                    <span className="text-[10px] font-medium text-zinc-600">{frontPrintY.toFixed(1)} см</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Sliders Stack */}
+                                            {/* Sliders Stack */}
+                                            <div className="space-y-3">
+                                                {/* Size */}
+                                                <div className="flex items-center gap-3 h-6">
+                                                    <Maximize className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <div className="flex-1 flex items-center">
+                                                        <input
+                                                            type="range"
+                                                            min="0.2"
+                                                            max="1"
+                                                            step="0.01"
+                                                            value={frontPrintSize}
+                                                            onChange={handleSizeChange}
+                                                            disabled={!frontPrint}
+                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Y Offset (Отступ) */}
+                                                <div className="flex items-center gap-3 h-6">
+                                                    <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <div className="flex-1 flex items-center">
+                                                        <input
+                                                            type="range"
+                                                            min={MIN_OFFSET_CM}
+                                                            max={maxOffset}
+                                                            step="0.5"
+                                                            value={frontPrintY}
+                                                            onChange={(e) => setFrontPrintY(Math.min(parseFloat(e.target.value), maxOffset))}
+                                                            disabled={!frontPrint}
+                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* X Offset (Смещение) */}
+                                                <div className="flex items-center gap-3 h-6">
+                                                    <ArrowLeftRight className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <div className="flex-1 flex items-center">
+                                                        <input
+                                                            type="range"
+                                                            min="-100"
+                                                            max="100"
+                                                            step="1"
+                                                            value={frontPrintX}
+                                                            onChange={handleFrontXChange}
+                                                            disabled={!frontPrint}
+                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <div className="h-px bg-zinc-100" />
+
+                                {/* ZONE 3: BACK PRINT */}
+                                <section className="space-y-4">
+
+                                    <div className="flex gap-4">
+                                        {/* Left Group: Card + Download */}
+                                        <div className="flex flex-col gap-3 items-center w-24 shrink-0">
+
+                                            {/* Preview Card */}
+                                            <div
+                                                className={`w-24 h-32 relative group transition-all duration-300 ${dragOverZone === 'back' ? 'scale-105' : ''}`}
+                                                onDragOver={(e) => handleDragOver(e, 'back')}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleDrop(e, 'back')}
+                                            >
+                                                {backPrint ? (
+                                                    <div
+                                                        className={`w-full h-full rounded-2xl border overflow-hidden relative cursor-grab active:cursor-grabbing transition-all duration-300 bg-transparent
+                                                    ${dragOverZone === 'back' ? 'border-zinc-900 ring-2 ring-zinc-900/10' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-lg hover:-translate-y-0.5'}
+                                                `}
+                                                        draggable="true"
+                                                        onDragStart={(e) => handleDragStart(e, 'back')}
+                                                    >
+                                                        <img src={backPrint} alt="Back Print" className="w-full h-full object-contain p-2 pointer-events-none" />
+                                                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={removeBackPrint}
+                                                                className="p-1.5 bg-white/80 backdrop-blur rounded-full text-zinc-400 hover:text-red-500 hover:bg-white shadow-sm transition-all"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <label
+                                                        className={`w-full h-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 gap-2
                                                     ${dragOverZone === 'back' ? 'border-zinc-900 bg-zinc-50 scale-95 opacity-80' : 'border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50'}
                                                 `}
+                                                    >
+                                                        <input type="file" className="hidden" accept="image/*" onChange={handleBackPrintUpload} />
+                                                        <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 transition-colors">
+                                                            <ImagePlus className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600" />
+                                                        </div>
+                                                        <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-600 text-center leading-tight px-1">Загрузить<br />принт</span>
+                                                    </label>
+                                                )}
+                                            </div>
+
+                                            {/* Download Button (Below Card) */}
+                                            <button
+                                                onClick={() => backPrint && downloadPrintImage(backPrint, currentBackPrintWidth, currentBackPrintHeight)}
+                                                disabled={!backPrint}
+                                                className={`w-full py-2 rounded-lg flex items-center justify-center transition-all ${backPrint ? 'bg-white border border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm' : 'bg-transparent border border-zinc-100 text-zinc-300'}`}
+                                                title="Скачать принт"
                                             >
+                                                <Download className="w-4 h-4" />
+                                            </button>
 
-                                                <input type="file" className="hidden" accept="image/*" onChange={handleBackPrintUpload} />
-                                                <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 transition-colors">
-                                                    <ImagePlus className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600" />
+                                        </div>
+
+                                        {/* Right: Controls */}
+                                        <div className="flex-1 flex flex-col gap-4 justify-between">
+                                            {/* Info Grid (CM) */}
+                                            <div className="bg-[#F5F5F7] rounded-xl p-2 grid grid-cols-3 gap-1 text-center items-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Ширина</span>
+                                                    <span className="text-[10px] font-medium text-zinc-600">{(currentBackPrintWidth).toFixed(1)} см</span>
                                                 </div>
-                                                <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-600 text-center leading-tight px-1">Загрузить<br />принт</span>
-                                            </label>
-                                        )}
-                                    </div>
+                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Высота</span>
+                                                    <span className="text-[10px] font-medium text-zinc-600">{(currentBackPrintHeight).toFixed(1)} см</span>
+                                                </div>
+                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
+                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase">Отступ</span>
+                                                    <span className="text-[10px] font-medium text-zinc-600">{backPrintY.toFixed(1)} см</span>
+                                                </div>
+                                            </div>
 
-                                    {/* Vertical Offset Slider (CM) */}
-                                    <div className="h-32 w-4 flex items-center justify-center relative">
-                                        <input
-                                            type="range"
-                                            min={MIN_BACK_OFFSET_CM}
-                                            max={maxBackOffset}
-                                            step="0.5"
-                                            value={backPrintY}
-                                            onChange={(e) => setBackPrintY(Math.min(parseFloat(e.target.value), maxBackOffset))}
-                                            disabled={!backPrint}
+                                            {/* Sliders Stack */}
+                                            {/* Sliders Stack */}
+                                            <div className="space-y-3">
+                                                {/* Size */}
+                                                <div className="flex items-center gap-3 h-6">
+                                                    <Maximize className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <div className="flex-1 flex items-center">
+                                                        <input
+                                                            type="range"
+                                                            min="0.2"
+                                                            max="1"
+                                                            step="0.01"
+                                                            value={backPrintSize}
+                                                            onChange={handleBackSizeChange}
+                                                            disabled={!backPrint}
+                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                        />
+                                                    </div>
+                                                </div>
 
-                                            className={`absolute w-32 h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner rotate-90 origin-center [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                        />
+                                                {/* Y Offset (Отступ) */}
+                                                <div className="flex items-center gap-3 h-6">
+                                                    <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <div className="flex-1 flex items-center">
+                                                        <input
+                                                            type="range"
+                                                            min={MIN_BACK_OFFSET_CM}
+                                                            max={maxBackOffset}
+                                                            step="0.5"
+                                                            value={backPrintY}
+                                                            onChange={(e) => setBackPrintY(Math.min(parseFloat(e.target.value), maxBackOffset))}
+                                                            disabled={!backPrint}
+                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                        />
+                                                    </div>
+                                                </div>
 
-                                    </div>
-                                </div>
-
-
-                                {/* Right: Info & Controls */}
-                                <div className="flex-1 flex flex-col gap-3 justify-center">
-                                    {/* Info Grid (CM) */}
-                                    <div className="bg-[#F5F5F7] rounded-xl p-2 grid grid-cols-3 gap-1 text-center items-center">
-
-
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase">Ширина</span>
-                                            <span className="text-[10px] font-medium text-zinc-600">{(currentBackPrintWidth).toFixed(0)} см</span>
+                                                {/* X Offset (Смещение) */}
+                                                <div className="flex items-center gap-3 h-6">
+                                                    <ArrowLeftRight className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <div className="flex-1 flex items-center">
+                                                        <input
+                                                            type="range"
+                                                            min="-100"
+                                                            max="100"
+                                                            step="1"
+                                                            value={backPrintX}
+                                                            onChange={handleBackXChange}
+                                                            disabled={!backPrint}
+                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase">Высота</span>
-                                            <span className="text-[10px] font-medium text-zinc-600">{(currentBackPrintHeight).toFixed(0)} см</span>
-                                        </div>
-                                        <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase">Отступ</span>
-                                            <span className="text-[10px] font-medium text-zinc-600">{backPrintY.toFixed(1)} см</span>
-                                        </div>
                                     </div>
+                                </section>
+                            </div>
 
-                                    {/* Horizontal Size Slider */}
-                                    <div className="space-y-1">
-                                        <input
-                                            type="range"
-                                            min="0.2"
-                                            max="1"
-                                            step="0.05"
-                                            value={backPrintSize}
-                                            onChange={handleBackSizeChange}
-                                            disabled={!backPrint}
-                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                        />
-                                    </div>
+                            {/* ZONE 4: EXPORT (Footer) */}
+                            {/* ZONE 4: EXPORT (Footer) */}
+                            <div className="p-6 pt-6 border-t border-zinc-200/50 bg-white/30 backdrop-blur-md mt-auto space-y-3">
+
+                                <div className="grid grid-cols-2 gap-3">
                                     <button
-                                        onClick={() => backPrint && downloadPrintImage(backPrint, currentBackPrintWidth, currentBackPrintHeight)}
-                                        disabled={!backPrint}
-                                        className={`w-full py-2 rounded-lg flex items-center justify-center transition-all ${backPrint ? 'bg-white border border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm' : 'bg-transparent border border-zinc-100 text-zinc-300'}`}
-                                        title="Скачать принт"
+                                        onClick={() => handleExport('copy')}
+                                        disabled={isExporting}
+                                        className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                                     >
-                                        <Download className="w-4 h-4" />
+                                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                                        {isExporting ? '...' : 'Копировать'}
                                     </button>
-
-
+                                    <button
+                                        onClick={() => handleExport('download')}
+                                        disabled={isExporting}
+                                        className="h-12 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-zinc-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                                    >
+                                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {isExporting ? '...' : 'Скачать'}
+                                    </button>
                                 </div>
                             </div>
-                        </section>
-                    </div >
 
-                    {/* ZONE 4: EXPORT (Footer) */}
-                    {/* ZONE 4: EXPORT (Footer) */}
-                    <div className="p-6 pt-6 border-t border-zinc-200/50 bg-white/30 backdrop-blur-md mt-auto space-y-3">
-                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Экспорт</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                onClick={() => handleExport('copy')}
-                                disabled={isExporting}
-                                className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
-                            >
-                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
-                                {isExporting ? '...' : 'Копировать'}
-                            </button>
-                            <button
-                                onClick={() => handleExport('download')}
-                                disabled={isExporting}
-                                className="h-12 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-zinc-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
-                            >
-                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                {isExporting ? '...' : 'Скачать'}
-                            </button>
-                        </div>
-                    </div>
-
-                </aside>
-            </div >
-        </div >,
+                        </aside>
+                    </motion.div >
+                </div >
+            )}
+        </AnimatePresence >,
         document.body
     );
 };

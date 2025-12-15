@@ -24,7 +24,7 @@ const loadImage = async (url: string): Promise<any> => {
 // --- Helper для текста ---
 const createText = (text: string, fontSize: number, fontWeight: string = 'bold') => {
     return new fabric.IText(text, {
-        fontFamily: 'Inter, Arial, sans-serif',
+        fontFamily: 'Arial, sans-serif',
         fontWeight: fontWeight,
         fontSize: fontSize,
         fill: '#FFFFFF',

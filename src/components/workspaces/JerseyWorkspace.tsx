@@ -8,9 +8,10 @@ import { exportHighRes } from '../../utils/ExportUtils';
 interface JerseyWorkspaceProps {
     onSwitchTemplate: (template: TemplateType) => void;
     onOpenMockup: () => void;
+    mockupPrintCount?: number;
 }
 
-export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup }) => {
+export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, mockupPrintCount }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [isReady, setIsReady] = useState(false);
 
@@ -223,7 +224,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         <button
                             key={item.id}
                             onClick={() => onSwitchTemplate(item.id as TemplateType)}
-                            className={`w-[44px] h-[44px] flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${item.id === 'jersey' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'}`}
+                            className={`w-[44px] h-[44px] flex items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] active:scale-90 active:translate-y-0 ${item.id === 'jersey' ? 'bg-zinc-900 text-white shadow-md' : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900 active:bg-zinc-200 active:border-zinc-200 active:shadow-none'}`}
                             title={item.label}
                         >
                             <item.icon className="w-[18px] h-[18px] transform-gpu will-change-transform antialiased [backface-visibility:hidden] [transform:translateZ(0)]" />
@@ -254,7 +255,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         </button>
                     </div>
 
-                    <div className="relative group w-full mb-4">
+                    <div className="relative group w-full mb-2">
                         <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                         <input
                             type="text"
@@ -265,7 +266,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                         />
                     </div>
 
-                    <div className="relative group w-full mb-4">
+                    <div className="relative group w-full mb-2">
                         <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
                         <input
                             type="text"
@@ -278,7 +279,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                     </div>
 
                     {/* Color Picker */}
-                    <div className="flex items-center gap-3 mb-2 pt-2">
+                    <div className="flex items-center gap-3 mb-2">
 
                         <div className="flex gap-2">
                             <button
@@ -348,24 +349,39 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
                 </section>
 
                 {/* Primary Action Button (Section Style / Large) */}
-                <div className="flex justify-center mt-4 p-4">
-                    <button
-                        className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 cursor-pointer transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900 active:scale-95 group relative transform-gpu will-change-transform [backface-visibility:hidden]"
-                        title="На макет"
-                    >
-                        <Shirt className="w-7 h-7 transform-gpu will-change-transform" strokeWidth={2} />
-                    </button>
+
+
+                <div className="pt-6 border-t border-zinc-200/50 mt-auto">
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            className="h-12 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                        >
+                            <Shirt className="w-4 h-4" />
+                            На макет
+                        </button>
+                        <button
+                            onClick={() => canvas && exportHighRes(canvas)}
+                            className="h-12 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-zinc-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                        >
+                            <ArrowDownToLine className="w-4 h-4" />
+                            Скачать
+                        </button>
+                    </div>
                 </div>
             </aside>
 
             {/* MAIN AREA */}
             <main className="flex-1 flex overflow-hidden relative">
                 <div className="fixed top-6 right-6 flex gap-3 z-[100] items-center">
-                    <button onClick={onOpenMockup} className="flex items-center gap-2 bg-white/80 backdrop-blur-md border border-zinc-200 text-zinc-700 rounded-full py-2.5 px-6 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer transform-gpu will-change-transform [backface-visibility:hidden]">
-                        <Shirt className="w-3.5 h-3.5" /> Макет
-                    </button>
-                    <button onClick={() => canvas && exportHighRes(canvas)} className="flex items-center gap-2 bg-zinc-900 text-white rounded-full py-2.5 px-6 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 font-medium text-sm cursor-pointer transform-gpu will-change-transform [backface-visibility:hidden]">
-                        <ArrowDownToLine className="w-4 h-4" /> Файл
+                    <button
+                        onClick={onOpenMockup}
+                        className="relative group w-14 h-14 bg-white/90 backdrop-blur-md border border-zinc-200/50 rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center cursor-pointer overflow-visible"
+                        title="Перейти к макету"
+                    >
+                        <Shirt className="w-6 h-6 text-zinc-700 group-hover:text-zinc-900 transition-colors" opacity={0.8} strokeWidth={1.5} />
+                        <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-zinc-900 text-white text-xs font-bold flex items-center justify-center rounded-full shadow-md border-2 border-white transform scale-100 group-hover:scale-110 transition-transform">
+                            {mockupPrintCount || 0}
+                        </div>
                     </button>
                 </div>
                 <div className={`flex-1 relative overflow-hidden transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
