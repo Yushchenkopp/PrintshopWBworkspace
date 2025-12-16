@@ -82,7 +82,16 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
 
     const [dragOverZone, setDragOverZone] = useState<'front' | 'back' | null>(null);
     const [isExporting, setIsExporting] = useState(false);
+    // Performance Optimization: Track animation state to toggle heavy filters
+    const [isAnimating, setIsAnimating] = useState(false);
     const previewRef = React.useRef<HTMLDivElement>(null);
+
+    // Reset animation state when opening/closing
+    React.useEffect(() => {
+        if (isOpen) {
+            setIsAnimating(true);
+        }
+    }, [isOpen]);
 
 
 
@@ -528,7 +537,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                 <div className="fixed inset-0 z-[200] flex items-center justify-center">
                     {/* Backdrop */}
                     <motion.div
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        className="absolute inset-0 bg-black/60" // Removed backdrop-blur-sm for performance
                         onClick={onClose}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -544,14 +553,13 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                             scale: 0.92,
                             x: 40,
                             y: -40,
-                            // filter: 'blur(20px)' // Performance optimization: Removed blur
                         }}
+                        onAnimationComplete={() => setIsAnimating(false)}
                         animate={{
                             opacity: 1,
                             scale: 1,
                             x: 0,
                             y: 0,
-                            // filter: 'blur(0px)', // Performance optimization: Removed blur
                             transition: {
                                 type: "spring",
                                 damping: 32,
@@ -676,7 +684,9 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                     style={{
                                                         maxHeight: '100%',
                                                         maxWidth: '100%',
-                                                        filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
+                                                        // Only apply heavy filter when NOT animating (and not exporting, logic handled separately?)
+                                                        // Actually, keeping isAnimating check helps performance during open/close.
+                                                        filter: isAnimating ? 'none' : 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
                                                         // transform removed from here, moved to container
                                                     }}
                                                     onLoad={(e) => {
@@ -729,7 +739,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                     style={{
                                                         maxHeight: '100%',
                                                         maxWidth: '100%',
-                                                        filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
+                                                        filter: isAnimating ? 'none' : 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
                                                     }}
                                                     onLoad={(e) => {
                                                         const img = e.currentTarget;
