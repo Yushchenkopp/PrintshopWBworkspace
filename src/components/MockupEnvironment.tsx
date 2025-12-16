@@ -544,14 +544,14 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                             scale: 0.92,
                             x: 40,
                             y: -40,
-                            filter: 'blur(20px)'
+                            // filter: 'blur(20px)' // Performance optimization: Removed blur
                         }}
                         animate={{
                             opacity: 1,
                             scale: 1,
                             x: 0,
                             y: 0,
-                            filter: 'blur(0px)',
+                            // filter: 'blur(0px)', // Performance optimization: Removed blur
                             transition: {
                                 type: "spring",
                                 damping: 32,
@@ -562,14 +562,18 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                         exit={{
                             opacity: 0,
                             scale: 0.95,
-                            filter: 'blur(10px)',
+                            // filter: 'blur(10px)', // Performance optimization: Removed blur
                             transition: { duration: 0.2, ease: "easeInOut" }
                         }}
                     >
-                        {/* SVG Filter Definition for Fabric Texture */}
-
-
-
+                        {/* Back Button */}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-6 left-6 z-50 w-10 h-10 bg-white/80 backdrop-blur-md border border-zinc-200/50 rounded-full flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:scale-105 hover:bg-white shadow-sm transition-all"
+                            title="Назад"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
 
                         {/* --- FULL BACKGROUND: Image Preview --- */}
                         <div className="absolute inset-0 bg-[#e4e4e7] flex items-center justify-center overflow-hidden">
@@ -628,7 +632,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                             animate={{ opacity: 1, scale: 1 }}
                                             exit={{ opacity: 0 }}
                                             transition={{ duration: 0.5, ease: "easeInOut" }}
-                                            className="w-full h-full object-contain pointer-events-none block"
+                                            className="w-full h-full object-contain pointer-events-none block will-change-transform"
                                         />
                                     </AnimatePresence>
                                 </div>

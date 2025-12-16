@@ -191,8 +191,25 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
             try {
                 // Ensure font is loaded before rendering to prevent layout shifts
-                await document.fonts.load('44px Caveat');
-                await document.fonts.load('55px Caveat');
+                // Robust Font Loading Check
+                const fontStack = "Caveat";
+                try {
+                    await document.fonts.load(`44px "${fontStack}"`);
+                    await document.fonts.load(`55px "${fontStack}"`);
+                    await document.fonts.ready;
+
+                    // Double-check if the font is actually in the loaded set
+                    let isFontLoaded = document.fonts.check(`44px "${fontStack}"`);
+                    let attempts = 0;
+                    // Increased to 50 attempts * 100ms = 5 seconds max wait
+                    while (!isFontLoaded && attempts < 50) {
+                        await new Promise(r => setTimeout(r, 100));
+                        isFontLoaded = document.fonts.check(`44px "${fontStack}"`);
+                        attempts++;
+                    }
+                } catch (fontErr) {
+                    console.warn("Font loading warning:", fontErr);
+                }
 
                 let templateImg = templateRef.current;
                 if (!templateImg) {
@@ -564,6 +581,10 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+            {/* Font Warmer: Invisible element to force browser to download font immediately */}
+            <div style={{ fontFamily: 'Caveat', position: 'absolute', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+                Font Warmer: Интересно, когда я вырасту
+            </div>
             <aside className="sidebar-panel">
                 <div className="flex justify-center">
                     <img src="/logo.png" alt="Logo" className="w-[90px] opacity-80 drop-shadow-xl object-contain" />
