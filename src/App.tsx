@@ -30,6 +30,13 @@ function App() {
         Caveat Preload Text To Ensure Font Metrics Are Ready
       </div>
 
+      {/* Asset Preloader: Load mockup images into memory silently */}
+      <div className="hidden" aria-hidden="true" style={{ display: 'none' }}>
+        <img src="/mockup/mockup-white-full.webp" alt="" />
+        <img src="/mockup/mockup-black-full.webp" alt="" />
+        <img src="/mockup/back.webp" alt="" />
+      </div>
+
       {/* --- MOCKUP ENVIRONMENT (OVERLAY) --- */}
       {/* --- MOCKUP ENVIRONMENT (PERSISTENT) --- */}
       <MockupEnvironment

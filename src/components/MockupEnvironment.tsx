@@ -547,7 +547,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
 
                     {/* Modal Window */}
                     <motion.div
-                        className="relative w-[95vw] h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200"
+                        className="relative w-[95vw] h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200 transform-gpu will-change-transform [backface-visibility:hidden]"
                         initial={{
                             opacity: 0,
                             scale: 0.92,
