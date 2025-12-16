@@ -46,6 +46,8 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
     const [backPrintY, setBackPrintY] = useState(9); // Starts at 9cm
     const [backPrintX, setBackPrintX] = useState(0); // Starts at center (0cm)
     const [backImgAspectRatio, setBackImgAspectRatio] = useState(30 / 42);
+    // Aspect Ratio of the Mockup Image itself (Container)
+    const [mockupAspectRatio, setMockupAspectRatio] = useState<number | null>(null);
 
     // Report Count
     React.useEffect(() => {
@@ -69,8 +71,8 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
 
     // Print Area Calibration State
     const [isDebug, setIsDebug] = useState(false);
-    const [printArea, setPrintArea] = useState({ top: 32, left: 17.5, width: 13, height: 38 });
-    const [backPrintArea, setBackPrintArea] = useState({ top: 31, left: 49, width: 14, height: 39 }); // Default right side position
+    const [printArea, setPrintArea] = useState({ top: 32, left: 19.3, width: 13, height: 38 });
+    const [backPrintArea, setBackPrintArea] = useState({ top: 31, left: 48.5, width: 14, height: 39 }); // Default right side position
 
     // Export Calibration State
     const [isExportCalibration, setIsExportCalibration] = useState(false);
@@ -570,10 +572,14 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
 
 
                         {/* --- FULL BACKGROUND: Image Preview --- */}
-                        <div
-                            ref={previewRef}
-                            className="absolute inset-0 bg-[#e4e4e7]"
-                        >
+                        <div className="absolute inset-0 bg-[#e4e4e7] flex items-center justify-center overflow-hidden">
+                            {/* Ambient Background Layer */}
+                            <img
+                                src="/mockup/back.webp"
+                                alt=""
+                                className="absolute inset-0 w-full h-full object-cover opacity-100 z-0"
+                            />
+
                             {/* SVG Filter Definition (Moved inside for export capture) */}
                             <svg className="absolute w-0 h-0 pointer-events-none">
                                 <filter id="fabric-texture">
@@ -584,174 +590,193 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                 </filter>
                             </svg>
 
-                            <AnimatePresence mode="popLayout">
-                                <motion.img
-                                    key={shirtColor}
+                            {/* ASPECT RATIO LOCKED CONTAINER */}
+                            <div
+                                ref={previewRef}
+                                className="relative z-10 overflow-hidden flex items-center justify-center"
+                                style={{
+                                    height: 'auto',
+                                    width: 'auto',
+                                    maxHeight: '100%',
+                                    maxWidth: '100%',
+                                }}
+                            >
+                                {/* SIZER STUB: Maintains container geometry in normal flow */}
+                                <img
                                     src={`/mockup/mockup-${shirtColor}-full.webp`}
-                                    alt="T-Shirt Mockup"
-                                    crossOrigin="anonymous"
-                                    initial={{ opacity: 0, scale: 1.05 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.5, ease: "easeInOut" }}
-                                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                                />
-                            </AnimatePresence>
-
-                            {/* Front Print Layer (Dynamic Area + Debug Overlay) */}
-                            <div
-                                className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
-                                style={{
-                                    top: `${printArea.top}%`,
-                                    left: `${printArea.left}%`,
-                                    width: `${printArea.width}%`,
-                                    height: `${printArea.height}%`,
-                                    border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
-                                    backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
-                                }}
-                            >
-
-
-                                <AnimatePresence>
-                                    {frontPrint && (
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.8 }}
-                                            animate={{
-                                                opacity: 1,
-                                                scale: frontPrintSize,
-                                                x: `${((frontPrintX / 100) * ((ZONE_WIDTH_CM - currentPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
-                                            }}
-                                            exit={{ opacity: 0, scale: 0.8 }}
-                                            transition={{ duration: 0.3 }}
-                                            className="absolute flex items-start justify-center w-full h-full origin-top"
-                                            style={{
-                                                top: `${((frontPrintY - MIN_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
-                                            }}
-                                        >
-                                            <img
-                                                src={frontPrint}
-                                                alt="Print"
-                                                className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
-                                                style={{
-                                                    maxHeight: '100%',
-                                                    maxWidth: '100%',
-                                                    filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
-                                                    // transform removed from here, moved to container
-                                                }}
-                                                onLoad={(e) => {
-                                                    const img = e.currentTarget;
-                                                    setImgAspectRatio(img.naturalWidth / img.naturalHeight);
-                                                    // Reset X on new load
-                                                    setFrontPrintX(0);
-                                                }}
-
-                                            />
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-
-                            {/* Back Print Layer (Dynamic Area + Debug Overlay) */}
-                            <div
-                                className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
-                                style={{
-                                    top: `${backPrintArea.top}%`,
-                                    left: `${backPrintArea.left}%`,
-                                    width: `${backPrintArea.width}%`,
-                                    height: `${backPrintArea.height}%`,
-                                    border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
-                                    backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
-                                }}
-                            >
-
-
-                                <AnimatePresence>
-                                    {backPrint && (
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.8 }}
-                                            animate={{
-                                                opacity: 1,
-                                                scale: backPrintSize,
-                                                x: `${((backPrintX / 100) * ((ZONE_WIDTH_CM - currentBackPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
-                                            }}
-                                            exit={{ opacity: 0, scale: 0.8 }}
-                                            transition={{ duration: 0.3 }}
-                                            className="absolute flex items-start justify-center w-full h-full origin-top"
-                                            style={{
-                                                top: `${((backPrintY - MIN_BACK_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
-                                            }}
-                                        >
-                                            <img
-                                                src={backPrint}
-                                                alt="Back Print"
-                                                className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
-                                                style={{
-                                                    maxHeight: '100%',
-                                                    maxWidth: '100%',
-                                                    filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
-                                                }}
-                                                onLoad={(e) => {
-                                                    const img = e.currentTarget;
-                                                    setBackImgAspectRatio(img.naturalWidth / img.naturalHeight);
-                                                    setBackPrintX(0); // Reset X
-                                                }}
-                                            />
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-
-
-                            {/* Back Button (Top-Left) */}
-                            <button
-                                onClick={onClose}
-                                className="absolute top-8 left-8 w-12 h-12 flex items-center justify-center rounded-2xl bg-white/60 backdrop-blur-xl border transition-all duration-300 hover:bg-white hover:scale-105 active:scale-95 group z-50 cursor-pointer shadow-lg hover:shadow-xl"
-                                style={{
-                                    borderColor: 'rgba(255, 255, 255, 0.7) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.7)',
-                                    boxShadow: '0 8px 32px -4px rgba(0, 0, 0, 0.1)'
-                                }}
-                            >
-                                <ArrowLeft className="w-5 h-5 text-zinc-600 group-hover:text-zinc-900 transition-colors" strokeWidth={2.5} />
-                            </button>
-
-                            {/* Floating Size Indicator (Canvas 2) */}
-                            <div
-                                className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 flex items-center justify-center w-40 h-40"
-                                style={{
-                                    left: `${pos.x}%`, // Uses fixed state
-                                    top: `${pos.y}%`
-                                }}
-                            >
-                                <AnimatePresence mode="popLayout">
-                                    <motion.span
-                                        key={selectedSize}
-                                        initial={{ opacity: 0, y: 30, filter: 'blur(12px)', scale: 0.9 }}
-                                        animate={{ opacity: 0.3, y: 0, filter: 'blur(0px)', scale: 1 }}
-                                        exit={{ opacity: 0, y: -30, filter: 'blur(12px)', scale: 1.1 }}
-                                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                        className="absolute text-[6rem] leading-none font-black text-zinc-900 tracking-tighter font-sans antialiased select-none mix-blend-multiply"
-                                    >
-                                        {selectedSize}
-                                    </motion.span>
-                                </AnimatePresence>
-                            </div>
-
-                            {/* Export Crop Overlay */}
-                            {isExportCalibration && (
-                                <div
-                                    className="absolute pointer-events-none z-50 border-2 border-green-500 bg-green-500/10"
+                                    alt=""
+                                    className="max-w-full max-h-full object-contain opacity-0 pointer-events-none select-none relative z-0"
                                     style={{
-                                        top: `${exportCrop.top}%`,
-                                        left: `${exportCrop.left}%`,
-                                        width: `${exportCrop.width}%`,
-                                        height: `${exportCrop.height}%`
+                                        maxHeight: '90vh', // Backup constraint matching modal
+                                        maxWidth: '95vw'
+                                    }}
+                                    onLoad={(e) => {
+                                        const img = e.currentTarget;
+                                        setMockupAspectRatio(img.naturalWidth / img.naturalHeight);
+                                    }}
+                                />
+
+                                {/* ANIMATED VISIBLE LAYER: Absolutely positioned on top */}
+                                <div className="absolute inset-0 z-0">
+                                    <AnimatePresence mode="popLayout">
+                                        <motion.img
+                                            key={shirtColor}
+                                            src={`/mockup/mockup-${shirtColor}-full.webp`}
+                                            alt="T-Shirt Mockup"
+                                            crossOrigin="anonymous"
+                                            initial={{ opacity: 0, scale: 1.05 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.5, ease: "easeInOut" }}
+                                            className="w-full h-full object-contain pointer-events-none block"
+                                        />
+                                    </AnimatePresence>
+                                </div>
+
+                                {/* Print Layers - Absolute to the Wrapper, not the Screen */}
+
+                                {/* Front Print Layer (Dynamic Area + Debug Overlay) */}
+                                <div
+                                    className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
+                                    style={{
+                                        top: `${printArea.top}%`,
+                                        left: `${printArea.left}%`,
+                                        width: `${printArea.width}%`,
+                                        height: `${printArea.height}%`,
+                                        border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
+                                        backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
                                     }}
                                 >
-                                    <div className="absolute top-0 left-0 bg-green-500 text-white text-[9px] px-1">
-                                        Export Zone
-                                    </div>
+
+
+                                    <AnimatePresence>
+                                        {frontPrint && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                animate={{
+                                                    opacity: 1,
+                                                    scale: frontPrintSize,
+                                                    x: `${((frontPrintX / 100) * ((ZONE_WIDTH_CM - currentPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
+                                                }}
+                                                exit={{ opacity: 0, scale: 0.8 }}
+                                                transition={{ duration: 0.3 }}
+                                                className="absolute flex items-start justify-center w-full h-full origin-top"
+                                                style={{
+                                                    top: `${((frontPrintY - MIN_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
+                                                }}
+                                            >
+                                                <img
+                                                    src={frontPrint}
+                                                    alt="Print"
+                                                    className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
+                                                    style={{
+                                                        maxHeight: '100%',
+                                                        maxWidth: '100%',
+                                                        filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
+                                                        // transform removed from here, moved to container
+                                                    }}
+                                                    onLoad={(e) => {
+                                                        const img = e.currentTarget;
+                                                        setImgAspectRatio(img.naturalWidth / img.naturalHeight);
+                                                        // Reset X on new load
+                                                        setFrontPrintX(0);
+                                                    }}
+
+                                                />
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
-                            )}
+
+                                {/* Back Print Layer (Dynamic Area + Debug Overlay) */}
+                                <div
+                                    className="absolute flex items-start justify-center pointer-events-none z-10 overflow-hidden transition-all duration-200"
+                                    style={{
+                                        top: `${backPrintArea.top}%`,
+                                        left: `${backPrintArea.left}%`,
+                                        width: `${backPrintArea.width}%`,
+                                        height: `${backPrintArea.height}%`,
+                                        border: isDebug ? '1px dashed rgba(255, 0, 0, 0.5)' : 'none',
+                                        backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
+                                    }}
+                                >
+
+
+                                    <AnimatePresence>
+                                        {backPrint && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                animate={{
+                                                    opacity: 1,
+                                                    scale: backPrintSize,
+                                                    x: `${((backPrintX / 100) * ((ZONE_WIDTH_CM - currentBackPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
+                                                }}
+                                                exit={{ opacity: 0, scale: 0.8 }}
+                                                transition={{ duration: 0.3 }}
+                                                className="absolute flex items-start justify-center w-full h-full origin-top"
+                                                style={{
+                                                    top: `${((backPrintY - MIN_BACK_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
+                                                }}
+                                            >
+                                                <img
+                                                    src={backPrint}
+                                                    alt="Back Print"
+                                                    className={`w-full h-full object-contain object-top transition-all duration-300 ${shirtColor === 'white' ? 'mix-blend-multiply opacity-90' : 'mix-blend-normal opacity-95'}`}
+                                                    style={{
+                                                        maxHeight: '100%',
+                                                        maxWidth: '100%',
+                                                        filter: 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
+                                                    }}
+                                                    onLoad={(e) => {
+                                                        const img = e.currentTarget;
+                                                        setBackImgAspectRatio(img.naturalWidth / img.naturalHeight);
+                                                        setBackPrintX(0); // Reset X
+                                                    }}
+                                                />
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+
+                                {/* Floating Size Indicator (Canvas 2) */}
+                                <div
+                                    className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 flex items-center justify-center w-40 h-40"
+                                    style={{
+                                        left: `${pos.x}%`, // Uses fixed state
+                                        top: `${pos.y}%`
+                                    }}
+                                >
+                                    <AnimatePresence mode="popLayout">
+                                        <motion.span
+                                            key={selectedSize}
+                                            initial={{ opacity: 0, y: 30, filter: 'blur(12px)', scale: 0.9 }}
+                                            animate={{ opacity: 0.3, y: 0, filter: 'blur(0px)', scale: 1 }}
+                                            exit={{ opacity: 0, y: -30, filter: 'blur(12px)', scale: 1.1 }}
+                                            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                                            className="absolute text-[6rem] leading-none font-black text-zinc-900 tracking-tighter font-sans antialiased select-none mix-blend-multiply"
+                                        >
+                                            {selectedSize}
+                                        </motion.span>
+                                    </AnimatePresence>
+                                </div>
+
+                                {/* Export Crop Overlay */}
+                                {isExportCalibration && (
+                                    <div
+                                        className="absolute pointer-events-none z-50 border-2 border-green-500 bg-green-500/10"
+                                        style={{
+                                            top: `${exportCrop.top}%`,
+                                            left: `${exportCrop.left}%`,
+                                            width: `${exportCrop.width}%`,
+                                            height: `${exportCrop.height}%`
+                                        }}
+                                    >
+                                        <div className="absolute top-0 left-0 bg-green-500 text-white text-[9px] px-1">
+                                            Export Zone
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* --- RIGHT FLOATING SIDEBAR --- */}
