@@ -82,16 +82,8 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
 
     const [dragOverZone, setDragOverZone] = useState<'front' | 'back' | null>(null);
     const [isExporting, setIsExporting] = useState(false);
-    // Performance Optimization: Track animation state to toggle heavy filters
-    const [isAnimating, setIsAnimating] = useState(false);
+    // Performance Optimization: Removed isAnimating state as CSS filters are now lightweight
     const previewRef = React.useRef<HTMLDivElement>(null);
-
-    // Reset animation state when opening/closing
-    React.useEffect(() => {
-        if (isOpen) {
-            setIsAnimating(true);
-        }
-    }, [isOpen]);
 
 
 
@@ -550,28 +542,24 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                         className="relative w-[95vw] h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200 transform-gpu will-change-transform [backface-visibility:hidden]"
                         initial={{
                             opacity: 0,
-                            scale: 0.92,
-                            x: 40,
-                            y: -40,
+                            scale: 0.96, // Less dramatic scale
+                            y: 20, // Less vertical movement
                         }}
-                        onAnimationComplete={() => setIsAnimating(false)}
+                        // onAnimationComplete removed as we no longer need isAnimating optimization for CSS filters
                         animate={{
                             opacity: 1,
                             scale: 1,
-                            x: 0,
                             y: 0,
+                            x: 0,
                             transition: {
-                                type: "spring",
-                                damping: 32,
-                                stiffness: 350,
-                                mass: 1
+                                duration: 0.5,
+                                ease: [0.19, 1, 0.22, 1] // Apple-style Expo Out (Premium Snap)
                             }
                         }}
                         exit={{
                             opacity: 0,
-                            scale: 0.95,
-                            // filter: 'blur(10px)', // Performance optimization: Removed blur
-                            transition: { duration: 0.2, ease: "easeInOut" }
+                            scale: 0.96,
+                            transition: { duration: 0.3, ease: [0.19, 1, 0.22, 1] }
                         }}
                     >
                         {/* Back Button */}
@@ -592,15 +580,6 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                 className="absolute inset-0 w-full h-full object-cover opacity-100 z-0"
                             />
 
-                            {/* SVG Filter Definition (Moved inside for export capture) */}
-                            <svg className="absolute w-0 h-0 pointer-events-none">
-                                <filter id="fabric-texture">
-                                    <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
-                                    <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
-                                    <feComposite operator="in" in="coloredNoise" in2="SourceAlpha" result="grain" />
-                                    <feBlend mode="multiply" in="grain" in2="SourceGraphic" />
-                                </filter>
-                            </svg>
 
                             {/* ASPECT RATIO LOCKED CONTAINER */}
                             <div
@@ -636,14 +615,15 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                             src={`/mockup/mockup-${shirtColor}-full.webp`}
                                             alt="T-Shirt Mockup"
                                             crossOrigin="anonymous"
-                                            initial={{ opacity: 0, scale: 1.05 }}
-                                            animate={{ opacity: 1, scale: 1 }}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.5, ease: "easeInOut" }}
+                                            transition={{ duration: 0.3 }}
                                             className="w-full h-full object-contain pointer-events-none block will-change-transform"
                                         />
                                     </AnimatePresence>
                                 </div>
+
 
                                 {/* Print Layers - Absolute to the Wrapper, not the Screen */}
 
@@ -659,24 +639,23 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                         backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
                                     }}
                                 >
-
-
                                     <AnimatePresence>
                                         {frontPrint && (
                                             <motion.div
-                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{
                                                     opacity: 1,
                                                     scale: frontPrintSize,
                                                     x: `${((frontPrintX / 100) * ((ZONE_WIDTH_CM - currentPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
                                                 }}
-                                                exit={{ opacity: 0, scale: 0.8 }}
-                                                transition={{ duration: 0.3 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                transition={{ duration: 0.4, ease: [0.19, 1, 0.22, 1] }} // Premium Snap
                                                 className="absolute flex items-start justify-center w-full h-full origin-top"
                                                 style={{
                                                     top: `${((frontPrintY - MIN_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
                                                 }}
                                             >
+                                                {/* Print Image */}
                                                 <img
                                                     src={frontPrint}
                                                     alt="Print"
@@ -684,18 +663,21 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                     style={{
                                                         maxHeight: '100%',
                                                         maxWidth: '100%',
-                                                        // Only apply heavy filter when NOT animating (and not exporting, logic handled separately?)
-                                                        // Actually, keeping isAnimating check helps performance during open/close.
-                                                        filter: isAnimating ? 'none' : 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
-                                                        // transform removed from here, moved to container
+                                                        filter: 'contrast(1.05) brightness(0.98) sepia(0.05)', // Removed url(#fabric-texture)
                                                     }}
                                                     onLoad={(e) => {
                                                         const img = e.currentTarget;
                                                         setImgAspectRatio(img.naturalWidth / img.naturalHeight);
-                                                        // Reset X on new load
                                                         setFrontPrintX(0);
                                                     }}
-
+                                                />
+                                                {/* CSS Noise Overlay (Fabric Texture) - High Performance */}
+                                                <div
+                                                    className="absolute inset-0 z-20 pointer-events-none mix-blend-overlay opacity-[0.14]"
+                                                    style={{
+                                                        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                                                        backgroundSize: '120px 120px'
+                                                    }}
                                                 />
                                             </motion.div>
                                         )}
@@ -714,19 +696,17 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                         backgroundColor: isDebug ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
                                     }}
                                 >
-
-
                                     <AnimatePresence>
                                         {backPrint && (
                                             <motion.div
-                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{
                                                     opacity: 1,
                                                     scale: backPrintSize,
                                                     x: `${((backPrintX / 100) * ((ZONE_WIDTH_CM - currentBackPrintWidth) / 2) / ZONE_WIDTH_CM) * 100}%`
                                                 }}
-                                                exit={{ opacity: 0, scale: 0.8 }}
-                                                transition={{ duration: 0.3 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                transition={{ duration: 0.4, ease: [0.19, 1, 0.22, 1] }}
                                                 className="absolute flex items-start justify-center w-full h-full origin-top"
                                                 style={{
                                                     top: `${((backPrintY - MIN_BACK_OFFSET_CM) / ZONE_HEIGHT_CM) * 100}%`,
@@ -739,12 +719,20 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                     style={{
                                                         maxHeight: '100%',
                                                         maxWidth: '100%',
-                                                        filter: isAnimating ? 'none' : 'contrast(1.05) brightness(0.98) sepia(0.05) url(#fabric-texture)',
+                                                        filter: 'contrast(1.05) brightness(0.98) sepia(0.05)',
                                                     }}
                                                     onLoad={(e) => {
                                                         const img = e.currentTarget;
                                                         setBackImgAspectRatio(img.naturalWidth / img.naturalHeight);
                                                         setBackPrintX(0); // Reset X
+                                                    }}
+                                                />
+                                                {/* CSS Noise Overlay */}
+                                                <div
+                                                    className="absolute inset-0 z-20 pointer-events-none mix-blend-overlay opacity-[0.14]"
+                                                    style={{
+                                                        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                                                        backgroundSize: '120px 120px'
                                                     }}
                                                 />
                                             </motion.div>
