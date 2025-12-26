@@ -161,14 +161,74 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                             originX: 'center',
                             originY: 'center',
                             left: centerX,
-                            top: centerY
+                            top: centerY,
+                            centeredRotation: true // Rotate around center
                         });
 
-                        // Cover Logic
-                        const scaleX = finalWidth / img.width!;
-                        const scaleY = finalHeight / img.height!;
-                        const scale = Math.max(scaleX, scaleY);
-                        img.scale(scale);
+                        // Calculate Mask Bounds (Global) for Containment
+                        // Since clipPath is absolute, getBoundingRect gives canvas coords.
+                        const maskRect = clipPath.getBoundingRect();
+                        const maskCorners = [
+                            { x: maskRect.left, y: maskRect.top },
+                            { x: maskRect.left + maskRect.width, y: maskRect.top },
+                            { x: maskRect.left, y: maskRect.top + maskRect.height },
+                            { x: maskRect.left + maskRect.width, y: maskRect.top + maskRect.height }
+                        ];
+
+                        // Containment Function
+                        const checkContainment = () => {
+                            const angleRad = fabric.util.degreesToRadians(img.angle);
+                            const w = img.width!;
+                            const h = img.height!;
+                            const cx = img.left!;
+                            const cy = img.top!;
+
+                            // Cos/Sin for inverse rotation (-angle)
+                            const cos = Math.cos(-angleRad);
+                            const sin = Math.sin(-angleRad);
+
+                            let maxScaleX = 0;
+                            let maxScaleY = 0;
+
+                            // For each corner of the mask, check required scale
+                            maskCorners.forEach(p => {
+                                // Vector from center
+                                const dx = p.x - cx;
+                                const dy = p.y - cy;
+
+                                // Rotate vector to align with image local axis
+                                const localX = dx * cos - dy * sin;
+                                const localY = dx * sin + dy * cos;
+
+                                // Required half-size
+                                const reqHalfW = Math.abs(localX);
+                                const reqHalfH = Math.abs(localY);
+
+                                // Required scale
+                                const reqScaleX = (reqHalfW * 2) / w;
+                                const reqScaleY = (reqHalfH * 2) / h;
+
+                                if (reqScaleX > maxScaleX) maxScaleX = reqScaleX;
+                                if (reqScaleY > maxScaleY) maxScaleY = reqScaleY;
+                            });
+
+                            const requiredScale = Math.max(maxScaleX, maxScaleY);
+
+                            // Apply if current scale is too small
+                            // We allow user to scale UP, but strictly prevent scaling DOWN below containment.
+                            // During rotation, we force scale UP if needed.
+                            if (img.scaleX! < requiredScale) {
+                                img.scale(requiredScale);
+                            }
+                        };
+
+                        // Initial Containment
+                        checkContainment();
+
+                        // Attach Events
+                        img.on('rotating', checkContainment);
+                        img.on('scaling', checkContainment); // Also enforce during scaling
+                        img.on('modified', checkContainment); // Double check on end
 
                         // Filters will be applied by separate effect
                         img.filters = [];
@@ -195,7 +255,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                         img.setControlsVisibility({
                             tl: true, tr: true, bl: true, br: true,
                             mt: false, mb: false, ml: false, mr: false,
-                            mtr: false
+                            mtr: true // Enable Rotation
                         });
 
                         const objectsToResolve: fabric.Object[] = [img];
@@ -227,11 +287,11 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                 } else {
                     // Placeholder Logic
                     const bgObj = new fabric.Path(pathStr, {
-                        fill: '#f9f9fc',
-                        stroke: '#e4e4e7', // Initial stroke
+                        fill: '#f4f4f5', // Darker fill (zinc-100)
+                        stroke: '#a1a1aa', // Darker stroke (zinc-400) for visibility
                         strokeWidth: 9,
                         selectable: false,
-                        objectCaching: false,
+                        objectCaching: true, // Enable caching for performance
                         shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.1)', blur: 30, offsetX: 0, offsetY: 20 }),
                         originX: 'center',
                         originY: 'center',
@@ -249,21 +309,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                     } as any);
 
                     // Add Events
-                    group.on('mouseover', () => {
-                        // Dynamic access to state? No, 'isBorderEnabled' from closure is stale.
-                        // We need to check canvas state or use a ref if we want dynamic behavior inside event.
-                        // BUT, for placeholder, stroke color is simpler. 
-                        // Let's just set generic hover color. 
-                        // The actual render logic controls 'base' stroke.
-                        bgObj.set({ fill: '#ffffff', shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.2)', blur: 60, offsetX: 0, offsetY: 30 }) });
-                        group.animate({ scaleX: 1.035, scaleY: 1.035 }, { duration: 300, onChange: canvas.requestRenderAll.bind(canvas), easing: fabric.util.ease.easeOutQuad });
-                        canvas.requestRenderAll();
-                    });
-                    group.on('mouseout', () => {
-                        bgObj.set({ fill: '#f9f9fc', shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.1)', blur: 30, offsetX: 0, offsetY: 20 }) });
-                        group.animate({ scaleX: 1, scaleY: 1 }, { duration: 300, onChange: canvas.requestRenderAll.bind(canvas), easing: fabric.util.ease.easeOutQuad });
-                        canvas.requestRenderAll();
-                    });
+                    // Events: Removed hover effects for performance
                     group.on('mousedown', () => { fileInputsRefs.current[i]?.click(); });
 
                     resolve([group]);
@@ -350,7 +396,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                 // Placeholder is a Group containing a Path
                 const pathObj = (obj as fabric.Group).getObjects()[0]; // Assuming 1st object
                 if (pathObj) {
-                    pathObj.set({ stroke: isBorderEnabled ? 'black' : '#e4e4e7' });
+                    pathObj.set({ stroke: isBorderEnabled ? 'black' : '#a1a1aa' });
                     changed = true;
                 }
             }

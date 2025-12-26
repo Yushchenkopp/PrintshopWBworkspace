@@ -33,6 +33,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
     const [signatureText, setSignatureText] = useState<string>('A CHILD BORN\nTO SHINE');
     const [isSignatureEnabled, setIsSignatureEnabled] = useState<boolean>(false);
     const [isFooterEnabled, setIsFooterEnabled] = useState<boolean>(false); // Default OFF
+    const [isNameLeft, setIsNameLeft] = useState<boolean>(true); // Default Left (New)
     const [isBorderEnabled, setIsBorderEnabled] = useState<boolean>(false); // Canvas State (Delayed)
     const [visualBorderEnabled, setVisualBorderEnabled] = useState<boolean>(false); // UI State (Instant)
     const [isTransferring, setIsTransferring] = useState(false);
@@ -211,6 +212,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
         isSignatureEnabled: false,
         isBorderEnabled: false,
         isFooterEnabled: false,
+        isNameLeft: true,
         scaleX: 1,
         scaleY: 1,
         signatureScale: 1,
@@ -226,6 +228,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
         aspectRatio !== prevPropsRef.current.aspectRatio ||
         headerLines !== prevPropsRef.current.headerLines ||
         isFooterEnabled !== prevPropsRef.current.isFooterEnabled ||
+        isNameLeft !== prevPropsRef.current.isNameLeft ||
         isBorderEnabled !== prevPropsRef.current.isBorderEnabled ||
         textColor !== prevPropsRef.current.textColor; // Force re-render on color change
 
@@ -276,7 +279,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                         const imageUrls = images.map(img => img.url);
                         // Pass initial scale/pan to generate (though often reset on structure change, 
                         // preserving them gives better UX if just toggling footer)
-                        const newHeight = await generateBabyTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, scaleX, scaleY, signatureScale, manualPositions);
+                        const newHeight = await generateBabyTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, scaleX, scaleY, signatureScale, manualPositions, isNameLeft);
 
                         if (newHeight !== logicalCanvasHeight) {
                             setLogicalCanvasHeight(newHeight);
@@ -286,7 +289,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
 
                         setLogicalCanvasHeight(newHeight);
                         // Force Geometry Update to sync Border/Clip immediately (Fixes Scenario B Mismatch)
-                        updateImageGeometry(canvas, scaleX, scaleY);
+                        updateImageGeometry(canvas, scaleX, scaleY, isNameLeft);
 
                         if (!isReady) {
                             setTimeout(() => setIsReady(true), 150);
@@ -294,7 +297,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
 
                     } else if (isGeometryChanged) {
                         // Smart Geometry Update (No clear/reload)
-                        updateImageGeometry(canvas, scaleX, scaleY);
+                        updateImageGeometry(canvas, scaleX, scaleY, isNameLeft);
 
                     } else if (isFilterChanged) {
                         // Filter Update Only
@@ -302,7 +305,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
 
                     } else {
                         // Smart Update (Text Only + Signature)
-                        const newHeight = updateBabyHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled, scaleX, signatureScale, scaleY);
+                        const newHeight = updateBabyHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, headerLines, debouncedSignatureText, isSignatureEnabled, scaleX, signatureScale, scaleY, isNameLeft);
                         // Update logical height if changed (e.g. signature added/removed or resized)
                         if (newHeight && newHeight !== logicalCanvasHeight) {
                             setLogicalCanvasHeight(newHeight);
@@ -322,6 +325,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                         isSignatureEnabled,
                         isBorderEnabled,
                         isFooterEnabled,
+                        isNameLeft,
                         scaleX,
                         scaleY,
                         signatureScale,
@@ -333,7 +337,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, scaleX, scaleY, signatureScale, logicalCanvasHeight]); // Added logicalCanvasHeight
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, isFooterEnabled, isNameLeft, scaleX, scaleY, signatureScale, logicalCanvasHeight]); // Added logicalCanvasHeight
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -479,6 +483,17 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                         >
                             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${isFooterEnabled ? 'left-[14px]' : 'left-0.5'}`} />
                         </button>
+
+                        {/* Name Placement Toggle (Only visible if Footer Enabled) */}
+                        {isFooterEnabled && (
+                            <button
+                                onClick={() => setIsNameLeft(!isNameLeft)}
+                                className="ml-auto text-[10px] font-medium text-zinc-400 hover:text-zinc-600 transition-colors bg-zinc-100 px-2 py-1 rounded-md"
+                                title={isNameLeft ? "Имя слева (над штрихкодом)" : "Имя справа (под фото)"}
+                            >
+                                {isNameLeft ? 'Имя: Слева' : 'Имя: Справа'}
+                            </button>
+                        )}
                     </div>
 
 
@@ -725,7 +740,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                         {images.length === 0 && (
                             <div
                                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                                className="absolute cursor-pointer group flex flex-col items-center justify-center border-4 border-solid border-zinc-200 bg-white/50 backdrop-blur-xl rounded-3xl shadow-xl transition-all duration-500 ease-out hover:shadow-2xl hover:scale-[1.015] hover:bg-white/80 hover:border-zinc-300"
+                                className="absolute cursor-pointer group flex flex-col items-center justify-center border-4 border-solid border-zinc-200 bg-white/50 backdrop-blur-xl rounded-3xl shadow-xl hover:bg-white/60 transition-colors duration-200"
                                 style={{
                                     width: '2160px', // CONTENT_WIDTH
                                     height: '2160px', // Square
@@ -733,11 +748,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                                     top: `${660 + (headerLines - 1) * 255}px`
                                 }}
                             >
-                                <ImagePlus className="w-48 h-48 text-zinc-300 mb-8 group-hover:text-zinc-500 transition-colors duration-500" />
-                                <span className="text-6xl font-medium text-zinc-400 tracking-wide mb-4 transition-colors duration-500 group-hover:text-zinc-600">
-                                    Загрузить фото
-                                </span>
-
+                                <ImagePlus className="w-48 h-48 text-zinc-300 transition-colors duration-200" />
                             </div>
                         )}
                     </CanvasEditor>

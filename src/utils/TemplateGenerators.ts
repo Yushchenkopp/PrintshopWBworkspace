@@ -736,7 +736,8 @@ export const generateBabyTemplate = async (
     cropScaleX: number = 1,
     cropScaleY: number = 1,
     signatureScale: number = 1, // New Scale,
-    manualPositions: { left: number, top: number }[] = [] // New: Preserve Dragged Positions
+    manualPositions: { left: number, top: number }[] = [], // New: Preserve Dragged Positions
+    isNameLeft: boolean = true // New: Name Alignment (Default Left)
 ): Promise<number> => {
     if (!canvas) return 800;
 
@@ -1063,102 +1064,181 @@ export const generateBabyTemplate = async (
     // Top of grid + Visible Height + Margin
     const footerTop = gridTop + visibleH + footerMarginTop;
 
-    const barcodeWidth = CONTENT_WIDTH * 0.35;
-    const barcodeHeight = 70 * SCALE_FACTOR;
-    const barcode = createBarcode(barcodeWidth, barcodeHeight, textColor);
-    const barcodeOffsetY = 10 * SCALE_FACTOR;
-
-    // Barcode Left: Center X - (VisibleWidth / 2) + Padding?
-    // Original: PADDING_SIDE (Left edge).
-    // New: Left edge of Visible Photo.
-    // Visible Left = centerX - visibleW/2.
-    // So barcode Left = (centerX - visibleW/2). // Assuming aligned to photo left.
-    // Actually original was PADDING_SIDE, which matched photo left.
-    // So yes, align to visible photo left.
     const visibleLeft = centerX - (visibleW / 2);
+    const rightEdge = visibleLeft + visibleW;
 
-    barcode.set({ left: visibleLeft, top: footerTop + barcodeOffsetY, name: 'footer-barcode' });
-    canvas.add(barcode);
-
+    // Name Configuration
     const nameText = createText(footerTextValue, 60 * SCALE_FACTOR, 'normal');
     nameText.set({
         name: 'footer-name',
         fontFamily: 'Arial Black',
         fill: textColor,
-        originX: 'right',
-        originY: 'top',
-        // RIGHT ALIGNMENT: visibleLeft + visibleW
-        left: visibleLeft + visibleW,
-        top: footerTop
     });
     // Visual hide only if text empty (logic below), but here footer is enabled
     if (!footerTextValue) {
         nameText.visible = false;
         nameText.height = 0;
     }
+
     const maxNameWidth = CONTENT_WIDTH * 0.55;
     if (nameText.width! > maxNameWidth) {
         const scale = maxNameWidth / nameText.width!;
         nameText.set({ scaleX: scale, scaleY: scale });
     }
-    canvas.add(nameText);
 
-    if (isSignatureEnabled) {
-        const signatureFontSize = 28 * SCALE_FACTOR;
-        const signatureWidth = CONTENT_WIDTH * 0.5;
-        let signatureTop = footerTop;
-        if (footerTextValue) {
-            const nameHeight = nameText.height! * nameText.scaleY!;
-            signatureTop += nameHeight + (5 * SCALE_FACTOR);
-        } else {
-            // "A bit higher" logic needs care if we want fixed offsets?
-            // Actually keeps inconsistent.
-            signatureTop += (10 * SCALE_FACTOR);
-        }
-        const signature = new fabric.Textbox(signatureTextValue, {
-            width: signatureWidth,
-            fontFamily: 'Arial',
-            fontWeight: 'bold',
-            fontSize: signatureFontSize * signatureScale,
-            fill: textColor,
-            textAlign: 'right',
-            originX: 'right',
-            originY: 'top',
-            // ALIGN RIGHT to visible photo
-            left: visibleLeft + visibleW,
-            top: signatureTop,
-            splitByGrapheme: false,
-            selectable: false,
-            evented: false,
-            name: 'footer-signature'
-        });
-        canvas.add(signature);
-    }
+    // Signature Configuration
+    // Need to initialize signature regardless to set position
+    const signatureFontSize = 28 * SCALE_FACTOR;
+    const signatureWidth = CONTENT_WIDTH * 0.5;
 
+    // Barcode Configuration
+    const barcodeWidth = CONTENT_WIDTH * 0.35;
+    const barcodeHeight = 70 * SCALE_FACTOR;
+    const barcode = createBarcode(barcodeWidth, barcodeHeight, textColor);
+    const barcodeOffsetY = 10 * SCALE_FACTOR;
+
+    // Date Configuration
     const dateString = isSince ? `since ${footerDateValue}` : footerDateValue;
     const dateText = createText(dateString, 24 * SCALE_FACTOR, 'bold');
-    const dateTop = footerTop + barcodeOffsetY + barcodeHeight + (5 * SCALE_FACTOR);
     dateText.set({
         name: 'footer-date',
         fill: textColor,
-        originX: 'left',
-        originY: 'top',
-        left: visibleLeft, // ALIGN LEFT to visible photo
-        top: dateTop
     });
     const targetDateWidth = barcodeWidth * 0.7;
     if (dateText.width) {
         const scale = targetDateWidth / dateText.width;
         dateText.set({ scaleX: scale, scaleY: scale });
     }
-    canvas.add(dateText);
 
-    let totalHeight = dateTop + (30 * SCALE_FACTOR) + (40 * SCALE_FACTOR);
-    if (isSignatureEnabled) {
-        const sig = canvas.getObjects().find((o: any) => o.name === 'footer-signature');
-        if (sig) {
-            const sigBottom = sig.top! + sig.height! + (40 * SCALE_FACTOR);
-            if (sigBottom > totalHeight) totalHeight = sigBottom;
+    // --- PLACEMENT LOGIC ---
+    let totalHeight = 0;
+
+    if (isNameLeft) {
+        // --- LEFT ALIGNMENT (New Default) ---
+        // Stack Left: Name -> Barcode -> Date
+        // Stack Right: Signature
+
+        // 1. NAME (Top Left)
+        nameText.set({
+            originX: 'left',
+            originY: 'top',
+            left: visibleLeft,
+            top: footerTop
+        });
+        canvas.add(nameText);
+
+        const nameH = (nameText.visible) ? (nameText.height! * nameText.scaleY!) : 0;
+
+        // 2. BARCODE (Left, below Name)
+        // 2. BARCODE (Left, below Name)
+        // Reduced gap further (Negative to tighten visual gap)
+        const barcodeTop = footerTop + nameH + (nameH > 0 ? -10 * SCALE_FACTOR : 0);
+        barcode.set({
+            left: visibleLeft,
+            top: barcodeTop + barcodeOffsetY,
+            name: 'footer-barcode'
+        });
+        canvas.add(barcode);
+
+        // 3. DATE (Left, below Barcode)
+        const dateTop = barcodeTop + barcodeOffsetY + barcodeHeight + (5 * SCALE_FACTOR);
+        dateText.set({
+            originX: 'left',
+            originY: 'top',
+            left: visibleLeft,
+            top: dateTop
+        });
+        canvas.add(dateText);
+
+        // 4. SIGNATURE (Right, Top aligned with Footer Top, or balanced?)
+        // Let's align top with Name top (footerTop)
+        if (isSignatureEnabled) {
+            const signature = new fabric.Textbox(signatureTextValue, {
+                width: signatureWidth,
+                fontFamily: 'Arial',
+                fontWeight: 'bold',
+                fontSize: signatureFontSize * signatureScale,
+                fill: textColor,
+                textAlign: 'right',
+                originX: 'right',
+                originY: 'top',
+                left: rightEdge,
+                top: footerTop + (5 * SCALE_FACTOR), // Visual tweak
+                splitByGrapheme: false,
+                selectable: false,
+                evented: false,
+                name: 'footer-signature'
+            });
+            canvas.add(signature);
+        }
+
+        totalHeight = dateTop + (30 * SCALE_FACTOR) + (40 * SCALE_FACTOR);
+
+    } else {
+        // --- RIGHT ALIGNMENT (Original) ---
+        // Stack Left: Barcode -> Date
+        // Stack Right: Name -> Signature
+
+        // 1. BARCODE (Left, Top)
+        barcode.set({ left: visibleLeft, top: footerTop + barcodeOffsetY, name: 'footer-barcode' });
+        canvas.add(barcode);
+
+        // 2. NAME (Right, Top)
+        nameText.set({
+            originX: 'right',
+            originY: 'top',
+            left: rightEdge,
+            top: footerTop
+        });
+        canvas.add(nameText);
+
+        // 3. SIGNATURE (Right, below Name)
+        if (isSignatureEnabled) {
+            let signatureTop = footerTop;
+            if (footerTextValue) {
+                const nameHeight = nameText.height! * nameText.scaleY!;
+                signatureTop += nameHeight + (5 * SCALE_FACTOR);
+            } else {
+                signatureTop += (10 * SCALE_FACTOR);
+            }
+            const signature = new fabric.Textbox(signatureTextValue, {
+                width: signatureWidth,
+                fontFamily: 'Arial',
+                fontWeight: 'bold',
+                fontSize: signatureFontSize * signatureScale,
+                fill: textColor,
+                textAlign: 'right',
+                originX: 'right',
+                originY: 'top',
+                left: rightEdge,
+                top: signatureTop,
+                splitByGrapheme: false,
+                selectable: false,
+                evented: false,
+                name: 'footer-signature'
+            });
+            canvas.add(signature);
+        }
+
+        // 4. DATE (Left, below Barcode)
+        const dateTop = footerTop + barcodeOffsetY + barcodeHeight + (5 * SCALE_FACTOR);
+        dateText.set({
+            originX: 'left',
+            originY: 'top',
+            left: visibleLeft,
+            top: dateTop
+        });
+        canvas.add(dateText);
+
+        totalHeight = dateTop + (30 * SCALE_FACTOR) + (40 * SCALE_FACTOR);
+
+        // Adjust for signature height if it's taller
+        if (isSignatureEnabled) {
+            const sig = canvas.getObjects().find((o: any) => o.name === 'footer-signature');
+            if (sig) {
+                const sigBottom = sig.top! + sig.height! + (40 * SCALE_FACTOR);
+                if (sigBottom > totalHeight) totalHeight = sigBottom;
+            }
         }
     }
 
@@ -1225,7 +1305,8 @@ export const updateBabyHeader = (
     isSignatureEnabled: boolean,
     cropScaleX: number = 1,
     signatureScale: number = 1, // New Scale,
-    cropScaleY: number = 1 // New Param
+    cropScaleY: number = 1, // New Param
+    isNameLeft: boolean = true // New Param
 ) => {
     if (!canvas) return;
 
@@ -1244,6 +1325,11 @@ export const updateBabyHeader = (
     // VISIBLE WIDTH LOGIC
     const baseClipW_H = CONTENT_WIDTH + (isBorderEnabled ? 0 : 2);
     const visibleW_H = baseClipW_H * cropScaleX;
+
+    // Geometry Constants for Layout
+    const centerX = FULL_WIDTH / 2;
+    const visibleLeft = centerX - (visibleW_H / 2);
+    const rightEdge = visibleLeft + visibleW_H;
 
     const headersToUpdate = canvas.getObjects().filter((obj: any) => obj.name && obj.name.startsWith('header-'));
 
@@ -1283,6 +1369,12 @@ export const updateBabyHeader = (
     const footerName = canvas.getObjects().find((obj: any) => obj.name === 'footer-name');
     if (footerName) {
         footerName.set({ fill: textColor });
+        // Update Alignment
+        if (isNameLeft) {
+            footerName.set({ originX: 'left', originY: 'top', left: visibleLeft });
+        } else {
+            footerName.set({ originX: 'right', originY: 'top', left: rightEdge });
+        }
         if (!footerTextValue) {
             footerName.set({ text: '', visible: false, height: 0 });
         } else {
@@ -1321,13 +1413,21 @@ export const updateBabyHeader = (
         const signatureWidth = CONTENT_WIDTH * 0.5;
 
         // Position Calculation
+        // Position Calculation
         const nameH = (footerNameObj && footerNameObj.visible) ? (footerNameObj.height! * footerNameObj.scaleY!) : 0;
 
         let signatureTop = footerTop;
-        if (footerTextValue && footerNameObj && footerNameObj.visible) {
-            signatureTop += nameH + (5 * SCALE_FACTOR);
+
+        if (isNameLeft) {
+            // Left Layout: Signature is Right, Aligned with Name Top
+            signatureTop = footerTop + (5 * SCALE_FACTOR);
         } else {
-            signatureTop += (10 * SCALE_FACTOR);
+            // Right Layout
+            if (footerTextValue && footerNameObj && footerNameObj.visible) {
+                signatureTop += nameH + (5 * SCALE_FACTOR);
+            } else {
+                signatureTop += (10 * SCALE_FACTOR);
+            }
         }
 
         if (signature) {
@@ -1338,7 +1438,8 @@ export const updateBabyHeader = (
                 visible: true,
                 fontSize: baseFontSize * signatureScale,
                 top: signatureTop,
-                left: FULL_WIDTH - PADDING_SIDE
+                left: rightEdge, // Always align to right edge (respecting crop)
+                originX: 'right'
             });
         } else {
             // Create New
@@ -1368,10 +1469,28 @@ export const updateBabyHeader = (
 
     // 4. UPDATE DATE
     const footerDate = canvas.getObjects().find((obj: any) => obj.name === 'footer-date');
-    let dateTop = 0;
     if (footerDate) {
         const dateString = isSince ? `since ${footerDateValue}` : footerDateValue;
         footerDate.set({ text: dateString, fill: textColor });
+        // Ensure Date is Left Aligned
+        footerDate.set({ originX: 'left', originY: 'top', left: visibleLeft });
+
+        // Update Vertical Stacking
+        const nameH = (footerNameObj && footerNameObj.visible) ? (footerNameObj.height! * footerNameObj.scaleY!) : 0;
+        let barcodeTop = footerTop;
+        if (isNameLeft) {
+            barcodeTop = footerTop + nameH + (nameH > 0 ? -10 * SCALE_FACTOR : 0);
+        }
+
+        const barcodeOffsetY = 10 * SCALE_FACTOR;
+        const bGroup = canvas.getObjects().find((obj: any) => obj.name === 'footer-barcode');
+        if (bGroup) {
+            bGroup.set({ top: barcodeTop + barcodeOffsetY, left: visibleLeft });
+        }
+
+        const barcodeHeight = 70 * SCALE_FACTOR;
+        const dateTop = barcodeTop + barcodeOffsetY + barcodeHeight + (5 * SCALE_FACTOR);
+        footerDate.set({ top: dateTop });
         const barcodeWidth = CONTENT_WIDTH * 0.35;
         const targetDateWidth = barcodeWidth * 0.7;
         if (footerDate.width) {
@@ -1470,7 +1589,8 @@ export const updateCollageFilters = (
 export const updateImageGeometry = (
     canvas: any,
     cropScaleX: number,
-    cropScaleY: number
+    cropScaleY: number,
+    isNameLeft: boolean = true // New Param
 ) => {
     if (!canvas) return;
 
@@ -1616,49 +1736,89 @@ export const updateImageGeometry = (
         // Use Barcode as anchor (since it's always present if footer enabled)
         const fBarcode = canvas.getObjects().find((o: any) => o.name === 'footer-barcode');
 
-        let deltaY = 0;
-        if (fBarcode) {
-            // Original expected top for barcode relative to footerTop was +10*SCALE
-            // But we can just use the difference between Desired Footer Top and Current Footer Top?
-            // Wait, we don't know Current Footer Top easily.
-            // But we know barcode should be at newFooterTop + (10 * SCALE).
-            // So we can set it absolute!
-            // No, because signature has dynamic offset.
-            // Better to calculate delta from barcode's CURRENT position vs DESIRED position.
-            const barcodeOffsetY = 10 * 3; // 10 * SCALE_FACTOR
-            const desiredBarcodeTop = newFooterTop + barcodeOffsetY;
-            deltaY = desiredBarcodeTop - fBarcode.top!;
+        // We need to re-apply layout logic based on new positions.
+        // It's safer to re-calculate absolute positions than shift dy.
+        // But dy is useful for shifting everything down if photo grows.
 
-            // Apply delta to ALL footer elements
-            fBarcode.top! += deltaY;
-            fBarcode.setCoords(); // Updates position
+        // New Footer Top is calculated above at 1691.
 
-            // Update Left alignment
-            fBarcode.set({ left: imgCenterLeft - halfW + PADDING });
+        // Let's just set positions directly using isNameLeft logic.
+
+        const footerTop = newFooterTop;
+        const barcodeOffsetY = 10 * 3; // 10 * SCALE_FACTOR
+
+        const fName = canvas.getObjects().find((o: any) => o.name === 'footer-name');
+        const fDate = canvas.getObjects().find((o: any) => o.name === 'footer-date');
+        const fSig = canvas.getObjects().find((o: any) => o.name === 'footer-signature'); // Actually signature is handled as loose object? No, name='footer-signature'
+
+        // Get Name Height if visible
+        let nameH = 0;
+        if (fName && fName.visible) {
+            nameH = fName.height! * fName.scaleY!;
         }
 
-        // Name (Right Aligned)
-        const fName = canvas.getObjects().find((o: any) => o.name === 'footer-name');
+        // 1. Footer Name Position
         if (fName) {
-            fName.set({ left: imgCenterLeft + halfW - PADDING });
-            if (fBarcode) fName.top! += deltaY; // Shift alongside barcode
+            if (isNameLeft) {
+                fName.set({
+                    originX: 'left', originY: 'top',
+                    left: imgCenterLeft - halfW + PADDING,
+                    top: footerTop
+                });
+            } else {
+                fName.set({
+                    originX: 'right', originY: 'top',
+                    left: imgCenterLeft + halfW - PADDING,
+                    top: footerTop
+                });
+            }
             fName.setCoords();
         }
 
-        // Signature (Right Aligned)
-        const fSig = canvas.getObjects().find((o: any) => o.name === 'footer-signature');
-        if (fSig) {
-            fSig.set({ left: imgCenterLeft + halfW - PADDING });
-            if (fBarcode) fSig.top! += deltaY;
-            fSig.setCoords();
+        // 2. Barcode Position
+        let barcodeTop = footerTop;
+        if (isNameLeft) {
+            barcodeTop = footerTop + nameH + (nameH > 0 ? -10 * 3 : 0);
         }
 
-        // Date (Left Aligned)
-        const fDate = canvas.getObjects().find((o: any) => o.name === 'footer-date');
+        if (fBarcode) {
+            fBarcode.set({
+                left: imgCenterLeft - halfW + PADDING,
+                top: barcodeTop + barcodeOffsetY
+            });
+            fBarcode.setCoords();
+        }
+
+        // 3. Date Position
+        // Below barcode
+        const barcodeH = 70 * 3;
+        const dateTop = barcodeTop + barcodeOffsetY + barcodeH + (5 * 3);
+
         if (fDate) {
-            fDate.set({ left: imgCenterLeft - halfW + PADDING });
-            if (fBarcode) fDate.top! += deltaY;
+            fDate.set({
+                left: imgCenterLeft - halfW + PADDING,
+                top: dateTop
+            });
             fDate.setCoords();
+        }
+
+        // 4. Signature Position
+        if (fSig) {
+            // Right aligned
+            let sigTop = footerTop;
+            if (isNameLeft) {
+                sigTop = footerTop + (5 * 3);
+            } else {
+                // Below name
+                if (nameH > 0) sigTop += nameH + (5 * 3);
+                else sigTop += (10 * 3);
+            }
+
+            fSig.set({
+                left: imgCenterLeft + halfW - PADDING,
+                top: sigTop
+            });
+            fSig.setCoords();
         }
 
     }

@@ -26,6 +26,16 @@ const SIZE_DIMENSIONS: Record<string, { width: number; height: number }> = {
     '3XL': { width: 41, height: 56 },
 };
 
+const SIZE_DETAILS: Record<string, string> = {
+    'XS': '42-44',
+    'S': '44-46',
+    'M': '46-48',
+    'L': '48-50',
+    'XL': '50-52',
+    'XXL': '52-54',
+    '3XL': '54-56',
+};
+
 
 export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, isOpen, onPrintCountChange, initialFrontPrint }) => {
     const [shirtColor, setShirtColor] = useState<'white' | 'black'>('white');
@@ -770,11 +780,11 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                         {/* --- RIGHT FLOATING SIDEBAR --- */}
                         <aside
                             className="absolute top-6 right-6 bottom-6 w-[400px] flex flex-col z-20 
-                    bg-white/60 backdrop-blur-xl border rounded-3xl overflow-hidden
+                    bg-white/90 backdrop-blur-2xl border rounded-3xl overflow-hidden
                     transition-all duration-300 ease-in-out"
                             style={{
-                                borderColor: 'rgba(255, 255, 255, 0.7) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.7)',
-                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                                borderColor: 'rgba(255, 255, 255, 0.5)',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 15px rgba(0,0,0,0.05)'
                             }}
                         >
                             {/* SCROLLABLE CONTENT (Zones 1-3) */}
@@ -899,12 +909,15 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                 <button
                                                     key={size}
                                                     onClick={() => setSelectedSize(size)}
-                                                    className={`h-10 flex items-center justify-center rounded-xl text-xs font-bold cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${selectedSize === size
+                                                    className={`h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer group relative transition-all duration-200 ease-out transform-gpu will-change-transform [backface-visibility:hidden] ${selectedSize === size
                                                         ? 'bg-zinc-900 text-white shadow-md'
                                                         : 'bg-white/40 border border-zinc-900/10 shadow-sm text-zinc-600 hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md hover:border-zinc-300 hover:text-zinc-900'
                                                         }`}
                                                 >
-                                                    {size}
+                                                    <span className="text-xs font-bold leading-none mb-0.5">{size === 'XXL' ? '2XL' : size}</span>
+                                                    <span className={`text-[9px] font-medium leading-none ${selectedSize === size ? 'text-zinc-300' : 'text-zinc-400 group-hover:text-zinc-500'}`}>
+                                                        {SIZE_DETAILS[size]}
+                                                    </span>
                                                 </button>
                                             ))}
                                         </div>
@@ -976,18 +989,18 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                         {/* Right: Controls */}
                                         <div className="flex-1 flex flex-col gap-4 justify-between">
                                             {/* Info Grid (CM) */}
-                                            <div className="bg-[#F5F5F7] rounded-xl p-2 grid grid-cols-3 gap-1 text-center items-center">
+                                            <div className="bg-white border border-zinc-200/60 rounded-xl p-2.5 grid grid-cols-3 gap-1 text-center items-center shadow-sm">
                                                 <div className="flex flex-col items-center gap-1">
-                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Ширина</span>
-                                                    <span className="text-[10px] font-medium text-zinc-600">{(currentPrintWidth).toFixed(1)} см</span>
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Ширина</span>
+                                                    <span className="text-[11px] font-semibold text-zinc-700">{(currentPrintWidth).toFixed(1)} см</span>
                                                 </div>
-                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
-                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Высота</span>
-                                                    <span className="text-[10px] font-medium text-zinc-600">{(currentPrintHeight).toFixed(1)} см</span>
+                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-100">
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Высота</span>
+                                                    <span className="text-[11px] font-semibold text-zinc-700">{(currentPrintHeight).toFixed(1)} см</span>
                                                 </div>
-                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-200/50">
-                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase">Отступ</span>
-                                                    <span className="text-[10px] font-medium text-zinc-600">{frontPrintY.toFixed(1)} см</span>
+                                                <div className="flex flex-col items-center gap-1 border-l border-zinc-100">
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Отступ</span>
+                                                    <span className="text-[11px] font-semibold text-zinc-700">{frontPrintY.toFixed(1)} см</span>
                                                 </div>
                                             </div>
 
@@ -996,7 +1009,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                             <div className="space-y-3">
                                                 {/* Size */}
                                                 <div className="flex items-center gap-3 h-6">
-                                                    <Maximize className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <Maximize className="w-3.5 h-3.5 text-zinc-500" />
                                                     <div className="flex-1 flex items-center">
                                                         <input
                                                             type="range"
@@ -1006,14 +1019,14 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                             value={frontPrintSize}
                                                             onChange={handleSizeChange}
                                                             disabled={!frontPrint}
-                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            className={`w-full h-1.5 bg-zinc-300 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-300 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                                         />
                                                     </div>
                                                 </div>
 
                                                 {/* Y Offset (Отступ) */}
                                                 <div className="flex items-center gap-3 h-6">
-                                                    <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
                                                     <div className="flex-1 flex items-center">
                                                         <input
                                                             type="range"
@@ -1023,14 +1036,14 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                             value={frontPrintY}
                                                             onChange={(e) => setFrontPrintY(Math.min(parseFloat(e.target.value), maxOffset))}
                                                             disabled={!frontPrint}
-                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            className={`w-full h-1.5 bg-zinc-300 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-300 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                                         />
                                                     </div>
                                                 </div>
 
                                                 {/* X Offset (Смещение) */}
                                                 <div className="flex items-center gap-3 h-6">
-                                                    <ArrowLeftRight className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <ArrowLeftRight className="w-3.5 h-3.5 text-zinc-500" />
                                                     <div className="flex-1 flex items-center">
                                                         <input
                                                             type="range"
@@ -1040,7 +1053,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                             value={frontPrintX}
                                                             onChange={handleFrontXChange}
                                                             disabled={!frontPrint}
-                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            className={`w-full h-1.5 bg-zinc-300 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-300 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!frontPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                                         />
                                                     </div>
                                                 </div>
@@ -1133,7 +1146,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                             <div className="space-y-3">
                                                 {/* Size */}
                                                 <div className="flex items-center gap-3 h-6">
-                                                    <Maximize className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <Maximize className="w-3.5 h-3.5 text-zinc-500" />
                                                     <div className="flex-1 flex items-center">
                                                         <input
                                                             type="range"
@@ -1143,14 +1156,14 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                             value={backPrintSize}
                                                             onChange={handleBackSizeChange}
                                                             disabled={!backPrint}
-                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            className={`w-full h-1.5 bg-zinc-300 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-300 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                                         />
                                                     </div>
                                                 </div>
 
                                                 {/* Y Offset (Отступ) */}
                                                 <div className="flex items-center gap-3 h-6">
-                                                    <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
                                                     <div className="flex-1 flex items-center">
                                                         <input
                                                             type="range"
@@ -1160,14 +1173,14 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                             value={backPrintY}
                                                             onChange={(e) => setBackPrintY(Math.min(parseFloat(e.target.value), maxBackOffset))}
                                                             disabled={!backPrint}
-                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            className={`w-full h-1.5 bg-zinc-300 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-300 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                                         />
                                                     </div>
                                                 </div>
 
                                                 {/* X Offset (Смещение) */}
                                                 <div className="flex items-center gap-3 h-6">
-                                                    <ArrowLeftRight className="w-3.5 h-3.5 text-zinc-400" />
+                                                    <ArrowLeftRight className="w-3.5 h-3.5 text-zinc-500" />
                                                     <div className="flex-1 flex items-center">
                                                         <input
                                                             type="range"
@@ -1177,7 +1190,7 @@ export const MockupEnvironment: React.FC<MockupEnvironmentProps> = ({ onClose, i
                                                             value={backPrintX}
                                                             onChange={handleBackXChange}
                                                             disabled={!backPrint}
-                                                            className={`w-full h-1.5 bg-zinc-200 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-200 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            className={`w-full h-1.5 bg-zinc-300 rounded-lg appearance-none shadow-inner [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-zinc-300 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 ${!backPrint ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                                         />
                                                     </div>
                                                 </div>

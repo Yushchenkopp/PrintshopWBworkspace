@@ -679,7 +679,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         {images.length === 0 && (
                             <div
                                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                                className="absolute cursor-pointer group flex flex-col items-center justify-center border-4 border-solid border-zinc-200 bg-white/50 backdrop-blur-xl rounded-3xl shadow-xl transition-all duration-500 ease-out hover:shadow-2xl hover:scale-[1.015] hover:bg-white/80 hover:border-zinc-300"
+                                className="absolute cursor-pointer group flex flex-col items-center justify-center border-4 border-solid border-zinc-200 bg-white/50 backdrop-blur-xl rounded-3xl shadow-xl hover:bg-white/60 transition-colors duration-200"
                                 style={{
                                     width: '2160px', // CONTENT_WIDTH
                                     height: '2160px', // Square
@@ -687,11 +687,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                     top: `${660 + (headerLines - 1) * 255}px`
                                 }}
                             >
-                                <ImagePlus className="w-48 h-48 text-zinc-300 mb-8 group-hover:text-zinc-500 transition-colors duration-500" />
-                                <span className="text-6xl font-medium text-zinc-400 tracking-wide mb-4 transition-colors duration-500 group-hover:text-zinc-600">
-                                    Загрузить фото
-                                </span>
-
+                                <ImagePlus className="w-48 h-48 text-zinc-300 transition-colors duration-200" />
                             </div>
                         )}
                     </CanvasEditor>
