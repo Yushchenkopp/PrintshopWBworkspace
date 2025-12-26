@@ -57,6 +57,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const [signatureScale, setSignatureScale] = useState<number>(1);
     const [isTransferring, setIsTransferring] = useState(false);
     const [isTransferSuccess, setIsTransferSuccess] = useState(false);
+    const [layoutVariant, setLayoutVariant] = useState<'default' | 'asymmetric'>('default'); // New State
 
     // Debounce signature text
     const [debouncedSignatureText, setDebouncedSignatureText] = useState<string>('WANNA BE YOURS');
@@ -189,8 +190,11 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
         signatureText: 'WANNA BE YOURS',
         isSignatureEnabled: false,
         isBorderEnabled: false,
-        signatureScale: 1
+
+        signatureScale: 1,
+        layoutVariant: 'default' // include in ref
     });
+
 
     const lastDateRef = useRef('05.09.2025');
 
@@ -202,7 +206,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
         currentImagesJson !== prevPropsRef.current.imagesJson ||
         aspectRatio !== prevPropsRef.current.aspectRatio ||
         headerLines !== prevPropsRef.current.headerLines ||
-        isBorderEnabled !== prevPropsRef.current.isBorderEnabled;
+        isBorderEnabled !== prevPropsRef.current.isBorderEnabled ||
+        layoutVariant !== prevPropsRef.current.layoutVariant;
 
     const shouldAutoZoom = !isReady || isStructureChanged;
 
@@ -226,7 +231,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         const isGridChanged =
                             currentImagesJson !== prevPropsRef.current.imagesJson ||
                             aspectRatio !== prevPropsRef.current.aspectRatio ||
-                            headerLines !== prevPropsRef.current.headerLines;
+                            headerLines !== prevPropsRef.current.headerLines ||
+                            layoutVariant !== prevPropsRef.current.layoutVariant;
 
                         let manualPositions: { left: number, top: number }[] = [];
 
@@ -239,7 +245,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         }
 
                         const imageUrls = images.map(img => img.url);
-                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, manualPositions);
+                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, manualPositions, layoutVariant);
 
                         if (newHeight !== logicalCanvasHeight) {
                             setLogicalCanvasHeight(newHeight);
@@ -286,7 +292,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         signatureText,
                         isSignatureEnabled,
                         isBorderEnabled,
-                        signatureScale
+                        signatureScale,
+                        layoutVariant
                     };
                 } catch (error) {
                     console.error("Error rendering template:", error);
@@ -294,7 +301,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, logicalCanvasHeight]); // Added logicalCanvasHeight
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, logicalCanvasHeight, layoutVariant]); // Added layoutVariant
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -372,7 +379,30 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     )}
                 </section>
 
+
+
                 <section>
+                    {/* Layout Selector for 9 Images */}
+                    {images.length === 9 && (
+                        <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-4">
+                            <div
+                                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-[6px] shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${layoutVariant === 'default' ? 'left-1' : 'left-[calc(50%)]'}`}
+                            />
+                            <button
+                                onClick={() => setLayoutVariant('default')}
+                                className={`flex-1 relative z-10 text-[13px] font-medium transition-colors duration-200 ${layoutVariant === 'default' ? 'text-black' : 'text-[#8E8E93]'}`}
+                            >
+                                Сетка 3x3
+                            </button>
+                            <button
+                                onClick={() => setLayoutVariant('asymmetric')}
+                                className={`flex-1 relative z-10 text-[13px] font-medium transition-colors duration-200 ${layoutVariant === 'asymmetric' ? 'text-black' : 'text-[#8E8E93]'}`}
+                            >
+                                Модульная
+                            </button>
+                        </div>
+                    )}
+
                     <div className="relative bg-[#F5F5F7] rounded-[10px] p-1 flex h-[36px] mb-8">
                         {/* Sliding Indicator */}
                         <div

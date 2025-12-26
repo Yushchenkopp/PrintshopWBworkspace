@@ -104,7 +104,8 @@ export const generateCollageTemplate = async (
     isSignatureEnabled: boolean = false, // New
     isBorderEnabled: boolean = false, // New Border logic
     signatureScale: number = 1, // New Scale,
-    manualPositions: { left: number, top: number }[] = [] // New: Preserve Dragged Positions
+    manualPositions: { left: number, top: number }[] = [], // New: Preserve Dragged Positions
+    layoutVariant: 'default' | 'asymmetric' = 'default' // New: Layout Variant
 ): Promise<number> => {
     if (!canvas) return 800;
 
@@ -244,12 +245,31 @@ export const generateCollageTemplate = async (
     const INNER_CONTENT_WIDTH = CONTENT_WIDTH - (BORDER_WIDTH * 2);
 
     // 2. Calculate column width
-    const numCols = colLayout.length;
-    const colWidth = numCols > 0 ? INNER_CONTENT_WIDTH / numCols : 0;
+    // NEW: Asymmetric Grid Logic (9 Photos)
+    const GAP = 10 * SCALE_FACTOR; // Fixed Gap between blocks
+    let numCols = colLayout.length;
+    let colWidth = numCols > 0 ? (INNER_CONTENT_WIDTH / numCols) : 0;
+
+    // For Asymmetric 9-photo layout
+    const isAsymmetric9 = (count === 9 && layoutVariant === 'asymmetric');
+
+    // Asymmetric Grid Params (Calculated later if active)
+    let asymUnitW = 0;
+    let asymUnitH = 0;
 
     let innerGridHeight = 0;
+
     if (count === 0) {
         innerGridHeight = CONTENT_WIDTH; // Default
+    } else if (isAsymmetric9) {
+        // 5-Column Logical Grid with Gaps
+        // Total Width = 5 * U + 4 * GAP
+        // U = (INNER_CONTENT_WIDTH - 4 * GAP) / 5
+        asymUnitW = (INNER_CONTENT_WIDTH - (4 * GAP)) / 5;
+        asymUnitH = asymUnitW / aspectRatio;
+
+        // Total Height = 3 Rows * V + 2 * GAP
+        innerGridHeight = (3 * asymUnitH) + (2 * GAP);
     } else {
         const maxPhotosInCol = colLayout.length > 0 ? Math.max(...colLayout) : 0;
         innerGridHeight = maxPhotosInCol * (colWidth / aspectRatio);
@@ -265,89 +285,196 @@ export const generateCollageTemplate = async (
     const OVERLAP = 2; // Always bleed to close gaps
 
     // --- RENDER IMAGES ---
-    let imageIndex = 0;
-    for (let col = 0; col < numCols; col++) {
-        const photosInCol = colLayout[col];
-        const photoHeight = innerGridHeight / photosInCol;
 
-        // Start from Padding + Border
-        const colLeft = PADDING_SIDE + BORDER_WIDTH + (col * colWidth);
+    if (isAsymmetric9) {
+        // --- ASYMMETRIC LAYOUT (9 Photos) ---
+        // Grid Map: [Col, Row, W, H] (Logical Units)
+        const SLOTS = [
+            { c: 0, r: 0, w: 1, h: 1 }, // 1. Left Top 1
+            { c: 1, r: 0, w: 1, h: 1 }, // 2. Left Top 2
+            { c: 0, r: 1, w: 2, h: 2 }, // 3. Left Bottom Big
+            { c: 2, r: 0, w: 1, h: 1 }, // 4. Center Top
+            { c: 2, r: 1, w: 1, h: 1 }, // 5. Center Mid
+            { c: 2, r: 2, w: 1, h: 1 }, // 6. Center Bot
+            { c: 3, r: 0, w: 2, h: 2 }, // 7. Right Top Big
+            { c: 3, r: 2, w: 1, h: 1 }, // 8. Right Bot Left
+            { c: 4, r: 2, w: 1, h: 1 }  // 9. Right Bot Right
+        ];
 
-        for (let row = 0; row < photosInCol; row++) {
-            if (imageIndex >= loadedImages.length) break;
+        for (let i = 0; i < 9; i++) {
+            if (i >= loadedImages.length) break;
+            const img = loadedImages[i];
+            if (!img) continue;
 
-            const img = loadedImages[imageIndex];
-            if (img) {
-                // Apply Filters
-                const filters = [];
-                if (isBW) filters.push(new fabric.filters.Grayscale());
-                if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness: brightness }));
+            const slot = SLOTS[i];
 
-                img.filters = filters;
-                img.applyFilters();
+            // Calculate Coordinates
+            // Left = PADDING + BORDER + (Col * (U + GAP))
+            // Top = gridTop + BORDER + (Row * (V + GAP))
+            const leftPos = PADDING_SIDE + BORDER_WIDTH + (slot.c * (asymUnitW + GAP));
+            const topPos = gridTop + BORDER_WIDTH + (slot.r * (asymUnitH + GAP));
 
-                const left = colLeft + (colWidth / 2);
-                const top = gridTop + BORDER_WIDTH + (row * photoHeight) + (photoHeight / 2);
+            const width = (slot.w * asymUnitW) + ((slot.w - 1) * GAP);
+            const height = (slot.h * asymUnitH) + ((slot.h - 1) * GAP);
 
-                // Override Position if Manual Data Exists (Preserve Pan)
-                let finalLeft = left;
-                let finalTop = top;
+            // Apply Filters
+            const filters = [];
+            if (isBW) filters.push(new fabric.filters.Grayscale());
+            if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness: brightness }));
+            img.filters = filters;
+            img.applyFilters();
 
-                if (manualPositions && manualPositions[imageIndex]) {
-                    finalLeft = manualPositions[imageIndex].left;
-                    finalTop = manualPositions[imageIndex].top;
-                }
+            // Center Points
+            const centerX = leftPos + width / 2;
+            const centerY = topPos + height / 2;
 
-                // DUAL LOGIC: Strip Gaps vs Strict Border
-                // REVISED: Always use OVERLAP = 2 to close internal gaps.
-                // The Composite Border (drawn on top) will mask the outer edges.
-                // const OVERLAP = 2; // Defined above
+            // Scale (Cover)
+            const scaleX = width / img.width!;
+            const scaleY = height / img.height!;
+            const scale = Math.max(scaleX, scaleY);
 
-                const scaleX = (colWidth + OVERLAP) / img.width!;
-                const scaleY = (photoHeight + OVERLAP) / img.height!;
-                const scale = Math.max(scaleX, scaleY);
-
-                // ClipPath Logic
-                // If Border Active: Clip Strict to visible cell (colWidth).
-                // If Border Inactive: Clip Loosely (colWidth + OVERLAP) to allow bleed.
-                const clipW = colWidth + OVERLAP;
-                const clipH = photoHeight + OVERLAP;
-
-                img.set({
-                    left: finalLeft,
-                    top: finalTop,
+            // Clip Path
+            img.set({
+                left: centerX,
+                top: centerY,
+                originX: 'center',
+                originY: 'center',
+                scaleX: scale,
+                scaleY: scale,
+                clipPath: new fabric.Rect({
+                    left: centerX,
+                    top: centerY,
+                    width: width,
+                    height: height,
                     originX: 'center',
                     originY: 'center',
-                    scaleX: scale,
-                    scaleY: scale,
-                    clipPath: new fabric.Rect({
-                        left: left,
-                        top: top,
-                        width: clipW,
-                        height: clipH,
+                    absolutePositioned: true
+                }),
+                strokeWidth: 0,
+                cornerColor: 'white',
+                borderColor: '#000',
+                transparentCorners: false,
+                perPixelTargetFind: true,
+                selectable: true,
+                hasControls: true,
+                cornerSize: 10 * SCALE_FACTOR,
+                touchCornerSize: 10 * SCALE_FACTOR
+            });
+
+            img.setControlsVisibility({
+                mt: false, mb: false, ml: false, mr: false,
+                tl: true, tr: true, bl: true, br: true,
+                mtr: false
+            });
+
+            canvas.add(img);
+
+            // NEW: Border Logic for Asymmetric Grid (Individual Borders)
+            if (isBorderEnabled && textColor === '#FFFFFF') {
+                const borderRect = new fabric.Rect({
+                    left: centerX,
+                    top: centerY,
+                    width: width,
+                    height: height,
+                    originX: 'center',
+                    originY: 'center',
+                    fill: 'transparent',
+                    stroke: '#000000',
+                    strokeWidth: 3, // Standard border thickness
+                    selectable: false,
+                    evented: false,
+                    name: `asym-border-${i}`
+                });
+                canvas.add(borderRect);
+            }
+        }
+
+    } else {
+        // --- STANDARD COLUMN LAYOUT ---
+        let imageIndex = 0;
+        for (let col = 0; col < numCols; col++) {
+            const photosInCol = colLayout[col];
+            const photoHeight = innerGridHeight / photosInCol;
+
+            // Start from Padding + Border
+            const colLeft = PADDING_SIDE + BORDER_WIDTH + (col * colWidth);
+
+            for (let row = 0; row < photosInCol; row++) {
+                if (imageIndex >= loadedImages.length) break;
+
+                const img = loadedImages[imageIndex];
+                if (img) {
+                    // Apply Filters
+                    const filters = [];
+                    if (isBW) filters.push(new fabric.filters.Grayscale());
+                    if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness: brightness }));
+
+                    img.filters = filters;
+                    img.applyFilters();
+
+                    const left = colLeft + (colWidth / 2);
+                    const top = gridTop + BORDER_WIDTH + (row * photoHeight) + (photoHeight / 2);
+
+                    // Override Position if Manual Data Exists (Preserve Pan)
+                    let finalLeft = left;
+                    let finalTop = top;
+
+                    if (manualPositions && manualPositions[imageIndex]) {
+                        finalLeft = manualPositions[imageIndex].left;
+                        finalTop = manualPositions[imageIndex].top;
+                    }
+
+                    // DUAL LOGIC: Strip Gaps vs Strict Border
+                    // REVISED: Always use OVERLAP = 2 to close internal gaps.
+                    // The Composite Border (drawn on top) will mask the outer edges.
+                    // const OVERLAP = 2; // Defined above
+
+                    const scaleX = (colWidth + OVERLAP) / img.width!;
+                    const scaleY = (photoHeight + OVERLAP) / img.height!;
+                    const scale = Math.max(scaleX, scaleY);
+
+                    // ClipPath Logic
+                    // If Border Active: Clip Strict to visible cell (colWidth).
+                    // If Border Inactive: Clip Loosely (colWidth + OVERLAP) to allow bleed.
+                    const clipW = colWidth + OVERLAP;
+                    const clipH = photoHeight + OVERLAP;
+
+                    img.set({
+                        left: finalLeft,
+                        top: finalTop,
                         originX: 'center',
                         originY: 'center',
-                        absolutePositioned: true
-                    }),
-                    strokeWidth: 0,
-                    cornerColor: 'white',
-                    borderColor: '#000',
-                    transparentCorners: false,
-                    perPixelTargetFind: true,
-                    selectable: true,
-                    hasControls: true, // EXPLICIT FORCE
-                    cornerSize: 10 * SCALE_FACTOR, // EXPLICIT FORCE (30px)
-                    touchCornerSize: 10 * SCALE_FACTOR
-                });
+                        scaleX: scale,
+                        scaleY: scale,
+                        clipPath: new fabric.Rect({
+                            left: left,
+                            top: top,
+                            width: clipW,
+                            height: clipH,
+                            originX: 'center',
+                            originY: 'center',
+                            absolutePositioned: true
+                        }),
+                        strokeWidth: 0,
+                        cornerColor: 'white',
+                        borderColor: '#000',
+                        transparentCorners: false,
+                        perPixelTargetFind: true,
+                        selectable: true,
+                        hasControls: true, // EXPLICIT FORCE
+                        cornerSize: 10 * SCALE_FACTOR, // EXPLICIT FORCE (30px)
+                        touchCornerSize: 10 * SCALE_FACTOR
+                    });
 
-                img.setControlsVisibility({
-                    mt: false, mb: false, ml: false, mr: false,
-                    tl: true, tr: true, bl: true, br: true, // EXPLICITLY ENABLE CORNERS
-                    mtr: false
-                });
-                canvas.add(img);
+                    img.setControlsVisibility({
+                        mt: false, mb: false, ml: false, mr: false,
+                        tl: true, tr: true, bl: true, br: true, // EXPLICITLY ENABLE CORNERS
+                        mtr: false
+                    });
+                    canvas.add(img);
+                }
+                imageIndex++;
             }
-            imageIndex++;
         }
     }
 
@@ -466,7 +593,7 @@ export const generateCollageTemplate = async (
 
     // Border Logic for Footer Version (Height includes grid)
     // 4. Border Logic (Composite 4 Rects) - MOVED HERE FOR Z-INDEX (TOP LAYER)
-    const isBorderActive = isBorderEnabled && textColor === '#FFFFFF' && innerGridHeight > 0;
+    const isBorderActive = isBorderEnabled && textColor === '#FFFFFF' && innerGridHeight > 0 && layoutVariant !== 'asymmetric';
 
     if (isBorderActive) {
         // Precise Frame Border (Composite 4 Rects)

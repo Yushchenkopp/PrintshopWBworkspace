@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
 import { type TemplateType } from '../../utils/TemplateGenerators';
-import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Sun, Shirt, Check, Loader2 } from 'lucide-react';
+import { Trash2, ImagePlus, ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, Plus, Sun, Shirt, Check, Loader2, Type, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as fabric from 'fabric';
@@ -44,6 +44,23 @@ const SLOTS = [
     { x: 652, y: 24, w: 533, h: 472 }
 ];
 
+const DEBUG_BOUNDARIES = false;
+
+// Helper to check text width
+const checkTextWidth = (text: string, fontSize: number, maxWidth: number): boolean => {
+    // Create a temporary canvas context for measurement
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return true; // Fallback if context creation fails
+
+    context.font = `${fontSize}px Caveat`;
+
+    // Check each line separately
+    const lines = text.split('\n');
+    return lines.every(line => context.measureText(line).width <= maxWidth);
+};
+
+
 export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, onTransferToMockup, mockupPrintCount }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [parent] = useAutoAnimate();
@@ -53,9 +70,31 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
     const templateRef = React.useRef<fabric.Image | null>(null);
 
     const [textVariant, setTextVariant] = useState<'wife' | 'husband'>('wife');
+    const [customTexts, setCustomTexts] = useState<[string, string]>([
+        "Интересно, когда я вырасту,\nкто будет моей женой?",
+        "Я буду!"
+    ]);
+    // ['center', 'right'] default for wife/husband templates
+    const [textAlignments, setTextAlignments] = useState<['left' | 'center' | 'right', 'left' | 'center' | 'right']>(['center', 'right']);
+
+    // Debug State
+    const [debugInfo, setDebugInfo] = useState<{ [key: number]: { padding: number, width: number } }>({});
+
     const [brightness, setBrightness] = useState<number>(0);
     const [isTransferring, setIsTransferring] = useState(false);
     const [isTransferSuccess, setIsTransferSuccess] = useState(false);
+
+    // Reset texts when variant changes
+    useEffect(() => {
+        setCustomTexts([
+            textVariant === 'wife'
+                ? "Интересно, когда я вырасту,\nкто будет моей женой?"
+                : "Интересно, когда я вырасту,\nкто будет моим мужем?",
+            "Я буду!"
+        ]);
+        // Reset alignment to defaults matching the template style
+        setTextAlignments(['center', 'right']);
+    }, [textVariant]);
 
     // We only need 2 images for Polaroid, but we keep the list flexible for the sidebar
     // However, the canvas will only display the first 2.
@@ -410,12 +449,9 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                 }
 
                 // 2. Prepare Text Fields
-                const textDefaults = [
-                    textVariant === 'wife'
-                        ? "Интересно, когда я вырасту,\nкто будет моей женой?"
-                        : "Интересно, когда я вырасту,\nкто будет моим мужем?",
-                    "Я буду!"
-                ];
+                // Use customTexts state
+                const currentTexts = customTexts;
+                const currentAligns = textAlignments;
 
                 for (let i = 0; i < 2; i++) {
                     const slot = SLOTS[i];
@@ -425,29 +461,44 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                     const slotW = slot.w;
                     const slotH = slot.h;
 
-                    const textTop = slotY + slotH; // Higher, directly under photo
+                    let textTop = slotY + slotH;
+                    if (i === 1) textTop -= 5; // Adjustment for right text to be slightly higher
 
                     let textLeft: number;
-                    let originX: 'center' | 'right' | 'left';
-                    let textAlign: 'center' | 'right' | 'left';
+                    let originX: 'center' | 'right' | 'left' = 'center';
                     let fontSize: number;
+                    const align = currentAligns[i];
+
+                    // Standardize Font Size for both to looks consistent, or keep distinct?
+                    // Previous: 44 (left), 55 (right).
+                    // Let's keep distinct defaults as requested "intuitive", but alignment changes position.
 
                     if (i === 0) {
-                        // First polaroid: Centered
-                        textLeft = slotX + slotW / 2;
-                        originX = 'center';
-                        textAlign = 'center';
                         fontSize = 44;
                     } else {
-                        // Second polaroid: Right aligned with padding
-                        textLeft = slotX + slotW - 30; // Shifted left from edge
+                        fontSize = 55;
+                    }
+
+                    // Calculate position based on alignment
+                    if (align === 'left') {
+                        textLeft = slotX + 30; // Padding from left
+                        originX = 'left';
+                    } else if (align === 'right') {
+                        textLeft = slotX + slotW - 30; // Padding from right
                         originX = 'right';
-                        textAlign = 'right';
-                        fontSize = 55; // Bigger font
+                    } else {
+                        // center
+                        textLeft = slotX + slotW / 2;
+                        originX = 'center';
+                    }
+
+                    // Adjustment for right text horizontal position
+                    if (i === 1) {
+                        textLeft += 5;
                     }
 
                     // Use Text to prevent unwanted auto-wrapping (enforces explicit newlines)
-                    const text = new fabric.Text(textDefaults[i], {
+                    const text = new fabric.Text(currentTexts[i], {
                         left: textLeft,
                         top: textTop,
                         // Removed width to prevent wrapping. Text will strictly follow \n
@@ -456,7 +507,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                         fill: '#27272a',
                         originX: originX,
                         originY: 'top',
-                        textAlign: textAlign,
+                        textAlign: align,
                         lineHeight: 0.8,
                         selectable: false, // Disable selection/movement
                         evented: false, // Disable events
@@ -472,6 +523,54 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                     // The initial position is calculated correctly above.
 
                     topLayer.push(text);
+
+                    // --- DEBUG VISUALIZATION ---
+                    if (DEBUG_BOUNDARIES) {
+                        const padding = 30;
+                        const debugRect = new fabric.Rect({
+                            left: slotX + padding,
+                            top: textTop,
+                            width: slotW - (padding * 2),
+                            height: 120, // Arbitrary visual height for text area
+                            fill: 'rgba(255, 0, 0, 0.1)',
+                            stroke: 'red',
+                            strokeWidth: 2,
+                            strokeDashArray: [5, 5],
+                            selectable: true,
+                            evented: true,
+                            transparentCorners: false,
+                            cornerColor: 'red',
+                            hasControls: true,
+                            lockRotation: true,
+                            lockUniScaling: false,
+                            uniformScaling: false
+                        });
+
+                        debugRect.setControlsVisibility({
+                            mt: true, mb: true, ml: true, mr: true,
+                            bl: true, br: true, tl: true, tr: true,
+                            mtr: false
+                        });
+
+                        const updateDebugInfo = () => {
+                            const padding = Math.round(debugRect.left - slotX);
+                            const width = Math.round(debugRect.getScaledWidth());
+                            setDebugInfo(prev => ({
+                                ...prev,
+                                [i]: { padding, width }
+                            }));
+                        };
+
+                        // Initial set
+                        updateDebugInfo();
+
+                        // Real-time updates
+                        debugRect.on('modified', updateDebugInfo);
+                        debugRect.on('scaling', updateDebugInfo);
+                        debugRect.on('moving', updateDebugInfo);
+
+                        topLayer.push(debugRect);
+                    }
                 }
 
                 // --- SYNCHRONOUS SWAP ---
@@ -524,37 +623,84 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
     }, [canvas, images]); // Removed textVariant and brightness to prevent re-render
 
-    // --- SMART UPDATE: TEXT VARIANT ---
+    // --- SMART UPDATE: TEXT ---
     useEffect(() => {
         if (!canvas) return;
-        const textDefaults = [
-            textVariant === 'wife'
-                ? "Интересно, когда я вырасту,\nкто будет моей женой?"
-                : "Интересно, когда я вырасту,\nкто будет моим мужем?",
-            "Я буду!"
-        ];
 
         // Find and update text objects
-        // We identify them by type 'text'.
         const textObjects = canvas.getObjects().filter(obj => obj.type === 'text') as fabric.Text[];
 
         // Sort by X position to guarantee Order: [Left, Right]
-        // This prevents "Я буду" from ending up on the left if stacking order is somehow flipped.
         textObjects.sort((a, b) => (a.left || 0) - (b.left || 0));
 
+        // Re-calculate constants for positioning updates
+        const canvasWidth = 1200;
+        const LOGICAL_CANVAS_WIDTH = 2400; // From CanvasEditor
+        const LOGICAL_CANVAS_HEIGHT = 1200; // From JSX
+        const OFFSET_X = (LOGICAL_CANVAS_WIDTH - canvasWidth) / 2;
+        // Template scaling calculation mirrored from render
+        // Ideal way would be to store these metrics or calculate them once, but re-calc is cheap here.
+        // Assuming template image is approx width we expect... 
+        // Let's rely on relative updating: 
+        // Actually, we need exact coords for alignment changes.
+        // Let's re-use SLOTS + OFFSET_X if template scaling is consistent (it is forced to 1200 width).
+        const imageWidth = 2480; // Approximate
+        const scale = canvasWidth / imageWidth;
+        // Wait, in renderPolaroid we assume templateImg.width is standard.
+        // Let's assume the renderPolaroid logic for OFFSET_X is correct and consistent.
+
+        // Let's just update based on SLOTS + OFFSET_X
+        // Since we know the Canvas is 1200 wide (offset applied inside parent component via viewBox?),
+        // Wait, CanvasEditor internal canvas is LOGICAL_CANVAS_WIDTH (2400).
+        // renderPolaroid uses:
+        // const canvasWidth = 1200;
+        // const OFFSET_X = (2400 - 1200) / 2 = 600.
+
+        // This seems correct.
+
+        const OFFSET_Y = (1200 - (3508 * (1200 / 2480))) / 2; // Rough approximation, but we only need X for alignment.
+
+        const updateTextObject = (obj: fabric.Text, index: number) => {
+            const align = textAlignments[index];
+            const text = customTexts[index];
+            const slot = SLOTS[index];
+            const slotX = slot.x + OFFSET_X;
+            const slotW = slot.w;
+
+            let newLeft: number;
+            let newOriginX: string;
+
+            if (align === 'left') {
+                newLeft = slotX + 30;
+                newOriginX = 'left';
+            } else if (align === 'right') {
+                newLeft = slotX + slotW - 30;
+                newOriginX = 'right';
+            } else {
+                newLeft = slotX + slotW / 2;
+                newOriginX = 'center';
+            }
+
+            // check if update needed
+            let needsUpdate = false;
+            if (obj.text !== text) { obj.set({ text }); needsUpdate = true; }
+            if (obj.textAlign !== align) { obj.set({ textAlign: align }); needsUpdate = true; }
+            if (obj.originX !== newOriginX) { obj.set({ originX: newOriginX }); needsUpdate = true; }
+            // Float comparison for left
+            if (Math.abs((obj.left || 0) - newLeft) > 1) { obj.set({ left: newLeft }); needsUpdate = true; }
+
+            return needsUpdate;
+        };
+
         if (textObjects.length >= 2) {
-            // Update First Text (Left)
-            if (textObjects[0].text !== textDefaults[0]) {
-                textObjects[0].set({ text: textDefaults[0] });
-            }
-            // Update Second Text (Right)
-            if (textObjects[1].text !== textDefaults[1]) {
-                textObjects[1].set({ text: textDefaults[1] });
-            }
-            canvas.requestRenderAll();
+            let changed = false;
+            if (updateTextObject(textObjects[0], 0)) changed = true;
+            if (updateTextObject(textObjects[1], 1)) changed = true;
+
+            if (changed) canvas.requestRenderAll();
         }
 
-    }, [canvas, textVariant]);
+    }, [canvas, customTexts, textAlignments]);
 
     // --- SMART UPDATE: BRIGHTNESS ---
     useEffect(() => {
@@ -632,6 +778,79 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                             Муж
                         </button>
                     </div>
+
+                    {/* Editable Text Inputs */}
+                    <div className="mt-4 space-y-3">
+                        {/* Text 1 (Left) */}
+                        <div className="flex gap-2 items-start">
+                            <div className="relative flex-1 group">
+                                <Type className="absolute left-3 top-3 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
+                                <textarea
+                                    value={customTexts[0]}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        // Max Width ~534px, Font Size 44, 2 lines max
+                                        if (val.split('\n').length <= 2 && checkTextWidth(val, 44, 534)) {
+                                            setCustomTexts([val, customTexts[1]]);
+                                        }
+                                    }}
+                                    className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 h-[66px] resize-none leading-tight"
+                                    placeholder=" Текст слева"
+                                />
+                            </div>
+                            <div className="flex flex-col bg-zinc-100 rounded-lg p-0.5 h-[66px] justify-between">
+                                {[
+                                    { id: 'left', icon: AlignLeft },
+                                    { id: 'center', icon: AlignCenter },
+                                    { id: 'right', icon: AlignRight }
+                                ].map((align) => (
+                                    <button
+                                        key={align.id}
+                                        onClick={() => setTextAlignments([align.id as any, textAlignments[1]])}
+                                        className={`p-1 rounded-md transition-all flex-1 flex items-center justify-center ${textAlignments[0] === align.id ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                    >
+                                        <align.icon className="w-3.5 h-3.5" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Text 2 (Right) */}
+                        <div className="flex gap-2 items-start">
+                            <div className="relative flex-1 group">
+                                <Type className="absolute left-3 top-3 w-4 h-4 text-zinc-400 group-focus-within:text-zinc-600 transition-colors" />
+                                <textarea
+                                    value={customTexts[1]}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        // Max Width ~527px, Font Size 55, 2 lines max
+                                        if (val.split('\n').length <= 2 && checkTextWidth(val, 55, 527)) {
+                                            setCustomTexts([customTexts[0], val]);
+                                        }
+                                    }}
+                                    className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200 h-[66px] resize-none leading-tight"
+                                    placeholder="Текст справа"
+                                />
+                            </div>
+                            <div className="flex flex-col bg-zinc-100 rounded-lg p-0.5 h-[66px] justify-between">
+                                {[
+                                    { id: 'left', icon: AlignLeft },
+                                    { id: 'center', icon: AlignCenter },
+                                    { id: 'right', icon: AlignRight }
+                                ].map((align) => (
+                                    <button
+                                        key={align.id}
+                                        onClick={() => setTextAlignments([textAlignments[0], align.id as any])}
+                                        className={`p-1 rounded-md transition-all flex-1 flex items-center justify-center ${textAlignments[1] === align.id ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                    >
+                                        <align.icon className="w-3.5 h-3.5" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+
                 </section>
 
                 <section>

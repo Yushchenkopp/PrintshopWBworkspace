@@ -1,5 +1,6 @@
 import UPNG from 'upng-js';
 import * as fabric from 'fabric';
+import * as iq from 'imageq';
 
 // Helper to set DPI in PNG Blob
 export const setDpi = (blob: Blob, dpi: number): Promise<Blob> => {
@@ -143,6 +144,45 @@ const trimTransparency = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
     return trimmed;
 };
 
+// Helper: Smart Quantization using imageq (NeuQuant + Floyd-Steinberg Dithering)
+const smartQuantize = (imgData: ImageData, numColors: number): ImageData => {
+    try {
+        const inPointContainer = iq.utils.PointContainer.fromUint8Array(
+            imgData.data,
+            imgData.width,
+            imgData.height
+        );
+
+        // 1. Color Distance Metric
+        const distanceCalculator = new iq.distance.Euclidean();
+
+        // 2. Palette Quantizer (NeuQuant is generally best for photos)
+        const paletteQuantizer = new iq.palette.NeuQuant(distanceCalculator, numColors);
+
+        // 3. Image Quantizer (Error Diffusion / Dithering)
+        // Floyd-Steinberg gives smooth gradients
+        const imageQuantizer = new iq.image.ErrorDiffusionArray(
+            distanceCalculator,
+            iq.image.ErrorDiffusionArrayKernel.FloydSteinberg
+        );
+
+        // 4. Generate Palette & Quantize
+        // Note: quantize() might take some time for large images, but it's pure JS/WASM
+        const outPointContainer = imageQuantizer.quantize(inPointContainer, paletteQuantizer);
+
+        const outUint8 = outPointContainer.toUint8Array();
+
+        return new ImageData(
+            new Uint8ClampedArray(outUint8.buffer),
+            imgData.width,
+            imgData.height
+        );
+    } catch (err) {
+        console.error("Smart Quantization failed:", err);
+        return imgData; // Fallback to original
+    }
+};
+
 export const generateHighResBlob = async (canvas: fabric.Canvas): Promise<Blob | null> => {
     if (!canvas) return null;
 
@@ -232,8 +272,17 @@ export const generateHighResBlob = async (canvas: fabric.Canvas): Promise<Blob |
         if (!ctx) throw new Error("Could not get context for trimmed canvas");
 
         const imgData = ctx.getImageData(0, 0, trimmedCanvas.width, trimmedCanvas.height);
-        // Optimize: 256 colors (lossy but high quality)
-        const upngBuffer = UPNG.encode([imgData.data.buffer], trimmedCanvas.width, trimmedCanvas.height, 256);
+
+        // Optimize: Smart Quantization via imageq (256 colors + Dithering)
+        // This reduces colors intelligently BEFORE sending to UPNG.
+        const quantizedImgData = smartQuantize(imgData, 256);
+
+        // Encode with UPNG in INDEXED mode (cnum = 256).
+        // CRITICAL OPTIMIZATION:
+        // We feed the ALREADY smart-quantized image (limited to 256 colors) to UPNG's 256-color mode.
+        // Step 1 (imageq): Reduces colors + adds Dithering (visual quality).
+        // Step 2 (UPNG 256): Sees <= 256 unique colors, builds an exact palette, saves as Indexed PNG (small size).
+        const upngBuffer = UPNG.encode([quantizedImgData.data.buffer], trimmedCanvas.width, trimmedCanvas.height, 256);
 
         let blob: Blob | null = new Blob([upngBuffer], { type: 'image/png' });
 
