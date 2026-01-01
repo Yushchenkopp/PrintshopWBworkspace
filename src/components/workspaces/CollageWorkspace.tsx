@@ -40,8 +40,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const [parent] = useAutoAnimate();
     const [images, setImages] = useState<{ id: string; url: string }[]>([]);
     const [headerText, setHeaderText] = useState<string>("GIRLFRIEND");
-    const [footerName, setFooterName] = useState<string>("VALERIA");
-    const [footerDate, setFooterDate] = useState<string>("05.09.2025");
+    const [footerName, setFooterName] = useState<string>("NAME");
+    const [footerDate, setFooterDate] = useState<string>("99.99.9999");
     const [isTranslitEnabled, setIsTranslitEnabled] = useState<boolean>(true);
     const [isBWEnabled, setIsBWEnabled] = useState<boolean>(true);
     const [isSinceEnabled, setIsSinceEnabled] = useState<boolean>(true);
@@ -196,7 +196,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     });
 
 
-    const lastDateRef = useRef('05.09.2025');
+    const lastDateRef = useRef('99.99.9999');
 
     // Calculate Structure Change (Render Phase)
     // We compare current props/state with the previously committed refs.
@@ -470,7 +470,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                 value={footerName}
                                 onChange={(e) => handleTextChange(setFooterName, e.target.value)}
                                 className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
-                                placeholder="VALERIA"
+                                placeholder="NAME"
                             />
                         </div>
                         <div className="relative group flex-1">
@@ -480,7 +480,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                 value={footerDate}
                                 onChange={(e) => handleTextChange(setFooterDate, e.target.value)}
                                 className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
-                                placeholder="05.09.2025"
+                                placeholder="99.99.9999"
                             />
                         </div>
                     </div>

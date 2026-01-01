@@ -14,7 +14,7 @@ interface MockupEnvironmentProps {
     initialFrontPrint?: string | null;
 }
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
 
 const SIZE_DIMENSIONS: Record<string, { width: number; height: number }> = {
     'XS': { width: 31, height: 44 },
@@ -22,7 +22,7 @@ const SIZE_DIMENSIONS: Record<string, { width: number; height: number }> = {
     'M': { width: 35, height: 48 },
     'L': { width: 36, height: 50 },
     'XL': { width: 36, height: 52 },
-    'XXL': { width: 38, height: 54 },
+    '2XL': { width: 38, height: 54 },
     '3XL': { width: 41, height: 56 },
 };
 
@@ -32,7 +32,7 @@ const SIZE_DETAILS: Record<string, string> = {
     'M': '46-48',
     'L': '48-50',
     'XL': '50-52',
-    'XXL': '52-54',
+    '2XL': '52-54',
     '3XL': '54-56',
 };
 

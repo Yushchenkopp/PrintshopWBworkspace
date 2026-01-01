@@ -20,8 +20,8 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [images, setImages] = useState<{ id: string; url: string }[]>([]);
     const [headerText, setHeaderText] = useState<string>("GENNADIEVICH");
-    const [footerName, setFooterName] = useState<string>("IVAN");
-    const [footerDate, setFooterDate] = useState<string>("05.09.2025");
+    const [footerName, setFooterName] = useState<string>("NAME");
+    const [footerDate, setFooterDate] = useState<string>("99.99.9999");
     const [isTranslitEnabled, setIsTranslitEnabled] = useState<boolean>(true);
     const [isBWEnabled, setIsBWEnabled] = useState<boolean>(true);
     const [isSinceEnabled, setIsSinceEnabled] = useState<boolean>(true);
@@ -50,7 +50,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
 
     const [originalValues, setOriginalValues] = useState<{
         header: string; name: string; date: string;
-    } | null>({ header: "ГЕННАДИЕВИЧ", name: "ИВАН", date: "05.09.2025" });
+    } | null>({ header: "ГЕННАДИЕВИЧ", name: "ИМЯ", date: "99.99.9999" });
 
     const [isReady, setIsReady] = useState(false);
 
@@ -219,7 +219,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
         textColor: '#000000'
     });
 
-    const lastDateRef = useRef('05.09.2025');
+    const lastDateRef = useRef('99.99.9999');
 
     // Calculate Structure Change (Render Phase)
     const currentImagesJson = JSON.stringify(images.map(img => img.url));
@@ -509,7 +509,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                                         value={footerName}
                                         onChange={(e) => handleTextChange(setFooterName, e.target.value)}
                                         className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
-                                        placeholder="ИВАН"
+                                        placeholder="NAME"
                                     />
                                 </div>
                                 <div className="relative group flex-1">
@@ -519,7 +519,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                                         value={footerDate}
                                         onChange={(e) => handleTextChange(setFooterDate, e.target.value)}
                                         className="w-full pl-10 pr-3 py-2.5 bg-zinc-100 rounded-xl border-transparent text-sm outline-none shadow-inner transition-all duration-200 placeholder:text-zinc-400 focus:bg-white focus:shadow-md focus:ring-2 focus:ring-zinc-200"
-                                        placeholder="05.09.2025"
+                                        placeholder="99.99.9999"
                                     />
                                 </div>
                             </div>
