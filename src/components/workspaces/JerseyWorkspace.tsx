@@ -235,7 +235,7 @@ export const JerseyWorkspace: React.FC<JerseyWorkspaceProps> = ({ onSwitchTempla
             {/* SIDEBAR */}
             <aside className="sidebar-panel">
                 <div className="flex justify-center">
-                    <img src="/logo.png" alt="Logo" className="w-[90px] opacity-80 drop-shadow-xl object-contain" />
+                    <img src="/logo.webp" alt="Logo" className="w-[70px] opacity-80 drop-shadow-xl object-contain" />
                 </div>
 
                 {/* Navigation Grid */}

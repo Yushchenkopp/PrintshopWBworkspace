@@ -345,9 +345,9 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
 
                 <div className="flex justify-center">
                     <img
-                        src="/logo.png"
+                        src="/logo.webp"
                         alt="Logo"
-                        className="w-[90px] opacity-80 drop-shadow-xl object-contain"
+                        className="w-[70px] opacity-80 drop-shadow-xl object-contain"
                     />
                 </div>
                 <div className="">

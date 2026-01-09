@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useDeferredValue } from 'react';
 import { CanvasEditor } from '../CanvasEditor';
 import { generateCollageTemplate, updateCollageHeader, updateCollageFilters } from '../../utils/TemplateGenerators';
 import type { TemplateType } from '../../utils/TemplateGenerators';
@@ -55,6 +55,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     const [isBorderEnabled, setIsBorderEnabled] = useState<boolean>(false); // Canvas State (Delayed)
     const [visualBorderEnabled, setVisualBorderEnabled] = useState<boolean>(false); // UI State (Instant)
     const [signatureScale, setSignatureScale] = useState<number>(1);
+    // Deferred value for smooth slider + throttled canvas updates
+    const deferredSignatureScale = useDeferredValue(signatureScale);
     const [isTransferring, setIsTransferring] = useState(false);
     const [isTransferSuccess, setIsTransferSuccess] = useState(false);
     const [layoutVariant, setLayoutVariant] = useState<'default' | 'asymmetric'>('default'); // New State
@@ -245,7 +247,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         }
 
                         const imageUrls = images.map(img => img.url);
-                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, manualPositions, layoutVariant);
+                        const newHeight = await generateCollageTemplate(canvas, imageUrls, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, deferredSignatureScale, manualPositions, layoutVariant);
 
                         if (newHeight !== logicalCanvasHeight) {
                             setLogicalCanvasHeight(newHeight);
@@ -266,7 +268,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         updateCollageFilters(canvas, isBWEnabled, brightness);
                     } else {
                         // Smart Update (Text Only + Signature)
-                        const newHeight = updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, debouncedSignatureText, isSignatureEnabled, signatureScale);
+                        const newHeight = updateCollageHeader(canvas, debouncedHeaderText, footerName, footerDate, isSinceEnabled, textColor, debouncedSignatureText, isSignatureEnabled, deferredSignatureScale);
                         // Update logical height if changed (e.g. signature added/removed)
                         if (newHeight && newHeight !== logicalCanvasHeight) {
                             setLogicalCanvasHeight(newHeight);
@@ -292,7 +294,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         signatureText,
                         isSignatureEnabled,
                         isBorderEnabled,
-                        signatureScale,
+                        signatureScale: deferredSignatureScale,
                         layoutVariant
                     };
                 } catch (error) {
@@ -301,7 +303,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
             };
             renderTemplate();
         }
-    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, signatureScale, logicalCanvasHeight, layoutVariant]); // Added layoutVariant
+    }, [canvas, images, aspectRatio, debouncedHeaderText, footerName, footerDate, isBWEnabled, isSinceEnabled, textColor, brightness, headerLines, debouncedSignatureText, isSignatureEnabled, isBorderEnabled, deferredSignatureScale, logicalCanvasHeight, layoutVariant]);
 
     return (
         <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -309,9 +311,9 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
 
                 <div className="flex justify-center">
                     <img
-                        src="/logo.png"
+                        src="/logo.webp"
                         alt="Logo"
-                        className="w-[90px] opacity-80 drop-shadow-xl object-contain"
+                        className="w-[70px] opacity-80 drop-shadow-xl object-contain"
                     />
                 </div>
                 <div className="">

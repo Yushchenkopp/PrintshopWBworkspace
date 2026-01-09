@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useDeferredValue } from 'react';
 import * as fabric from 'fabric';
 import { type TemplateType } from '../../utils/TemplateGenerators';
 import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, ImagePlus, Trash2, Sun, Plus, Shirt, Check, Loader2 } from 'lucide-react';
@@ -54,6 +54,8 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
     const [images, setImages] = useState<({ id: string; url: string } | null)[]>([null, null, null, null]);
     const [isGrayscale, setIsGrayscale] = useState(false);
     const [brightness, setBrightness] = useState(0);
+    // Deferred brightness for smooth slider + throttled filter application
+    const deferredBrightness = useDeferredValue(brightness);
     const [isBorderEnabled, setIsBorderEnabled] = useState(false);
     const [templateMode, setTemplateMode] = useState<'PAPA' | 'MAMA'>('PAPA');
     const [isTransferring, setIsTransferring] = useState(false);
@@ -175,60 +177,92 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                             { x: maskRect.left + maskRect.width, y: maskRect.top + maskRect.height }
                         ];
 
-                        // Containment Function
+                        // Containment Function (RAF throttled for performance)
+                        let rafId: number | null = null;
                         const checkContainment = () => {
+                            // Cancel pending RAF to avoid duplicate calls
+                            if (rafId !== null) return;
+
+                            rafId = requestAnimationFrame(() => {
+                                rafId = null;
+
+                                const angleRad = fabric.util.degreesToRadians(img.angle);
+                                const w = img.width!;
+                                const h = img.height!;
+                                const cx = img.left!;
+                                const cy = img.top!;
+
+                                // Cos/Sin for inverse rotation (-angle)
+                                const cos = Math.cos(-angleRad);
+                                const sin = Math.sin(-angleRad);
+
+                                let maxScaleX = 0;
+                                let maxScaleY = 0;
+
+                                // For each corner of the mask, check required scale
+                                maskCorners.forEach(p => {
+                                    // Vector from center
+                                    const dx = p.x - cx;
+                                    const dy = p.y - cy;
+
+                                    // Rotate vector to align with image local axis
+                                    const localX = dx * cos - dy * sin;
+                                    const localY = dx * sin + dy * cos;
+
+                                    // Required half-size
+                                    const reqHalfW = Math.abs(localX);
+                                    const reqHalfH = Math.abs(localY);
+
+                                    // Required scale
+                                    const reqScaleX = (reqHalfW * 2) / w;
+                                    const reqScaleY = (reqHalfH * 2) / h;
+
+                                    if (reqScaleX > maxScaleX) maxScaleX = reqScaleX;
+                                    if (reqScaleY > maxScaleY) maxScaleY = reqScaleY;
+                                });
+
+                                const requiredScale = Math.max(maxScaleX, maxScaleY);
+
+                                // Apply if current scale is too small
+                                if (img.scaleX! < requiredScale) {
+                                    img.scale(requiredScale);
+                                }
+                            });
+                        };
+
+                        // Initial Containment (immediate, not throttled)
+                        requestAnimationFrame(() => {
                             const angleRad = fabric.util.degreesToRadians(img.angle);
                             const w = img.width!;
                             const h = img.height!;
                             const cx = img.left!;
                             const cy = img.top!;
-
-                            // Cos/Sin for inverse rotation (-angle)
                             const cos = Math.cos(-angleRad);
                             const sin = Math.sin(-angleRad);
-
                             let maxScaleX = 0;
                             let maxScaleY = 0;
-
-                            // For each corner of the mask, check required scale
                             maskCorners.forEach(p => {
-                                // Vector from center
                                 const dx = p.x - cx;
                                 const dy = p.y - cy;
-
-                                // Rotate vector to align with image local axis
                                 const localX = dx * cos - dy * sin;
                                 const localY = dx * sin + dy * cos;
-
-                                // Required half-size
                                 const reqHalfW = Math.abs(localX);
                                 const reqHalfH = Math.abs(localY);
-
-                                // Required scale
                                 const reqScaleX = (reqHalfW * 2) / w;
                                 const reqScaleY = (reqHalfH * 2) / h;
-
                                 if (reqScaleX > maxScaleX) maxScaleX = reqScaleX;
                                 if (reqScaleY > maxScaleY) maxScaleY = reqScaleY;
                             });
-
                             const requiredScale = Math.max(maxScaleX, maxScaleY);
-
-                            // Apply if current scale is too small
-                            // We allow user to scale UP, but strictly prevent scaling DOWN below containment.
-                            // During rotation, we force scale UP if needed.
                             if (img.scaleX! < requiredScale) {
                                 img.scale(requiredScale);
                             }
-                        };
+                        });
 
-                        // Initial Containment
-                        checkContainment();
-
-                        // Attach Events
+                        // Attach Events (now throttled)
                         img.on('rotating', checkContainment);
-                        img.on('scaling', checkContainment); // Also enforce during scaling
-                        img.on('modified', checkContainment); // Double check on end
+                        img.on('scaling', checkContainment);
+                        img.on('modified', checkContainment);
 
                         // Filters will be applied by separate effect
                         img.filters = [];
@@ -249,7 +283,8 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                             transparentCorners: false,
                             cornerSize: 60,
                             touchCornerSize: 60,
-                            borderScaleFactor: 12
+                            borderScaleFactor: 12,
+                            objectCaching: true // Cache raster snapshot for faster redraws
                         });
 
                         img.setControlsVisibility({
@@ -278,6 +313,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                             left: centerX,
                             top: centerY,
                             visible: false, // Default hidden, separate effect enables it
+                            objectCaching: true, // Cache for faster redraws
                             data: { type: 'border', index: i }
                         } as any);
                         objectsToResolve.push(borderObj);
@@ -365,7 +401,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                 // Update filters
                 const filters: any[] = [];
                 if (isGrayscale) filters.push(new fabric.filters.Grayscale());
-                if (brightness !== 0) filters.push(new fabric.filters.Brightness({ brightness }));
+                if (deferredBrightness !== 0) filters.push(new fabric.filters.Brightness({ brightness: deferredBrightness }));
 
                 // Check if actually changed to avoid redundant apply
                 // Fabric filters comparison is hard, just re-apply.
@@ -376,7 +412,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
         });
 
         if (changed) canvas.requestRenderAll();
-    }, [canvas, brightness, isGrayscale, structureVersion]);
+    }, [canvas, deferredBrightness, isGrayscale, structureVersion]);
 
 
     // --- EFFECT: SMART BORDER ---
@@ -512,7 +548,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
             {/* --- SIDEBAR --- */}
             <aside className="sidebar-panel">
                 <div className="flex justify-center">
-                    <img src="/logo.png" alt="Logo" className="w-[90px] opacity-80 drop-shadow-xl object-contain" />
+                    <img src="/logo.webp" alt="Logo" className="w-[70px] opacity-80 drop-shadow-xl object-contain" />
                 </div>
 
                 {/* Workspace Switcher */}
