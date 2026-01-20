@@ -347,7 +347,7 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                     <img
                         src="/logo.webp"
                         alt="Logo"
-                        className="w-[70px] opacity-80 drop-shadow-xl object-contain"
+                        className="w-[220px] object-contain"
                     />
                 </div>
                 <div className="">
@@ -721,6 +721,19 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                         </button>
                     </div>
                 </div>
+
+                {/* Website Link */}
+                <a
+                    href="https://printshopspb.ru/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 py-3 flex items-center justify-center gap-2 text-zinc-400 hover:text-zinc-600 transition-all duration-300 group"
+                >
+                    <span className="text-sm font-medium tracking-wide group-hover:tracking-wider transition-all duration-300">printshopspb.ru</span>
+                    <svg className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                </a>
             </aside>
             <main className="flex-1 flex overflow-hidden relative">
                 <div className="fixed top-6 right-6 flex gap-3 z-[100] items-center">

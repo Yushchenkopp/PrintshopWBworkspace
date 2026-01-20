@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect, useDeferredValue } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import * as fabric from 'fabric';
 import { type TemplateType } from '../../utils/TemplateGenerators';
 import { ArrowDownToLine, LayoutDashboard, BookHeart, SquareParking, SquareUser, Volleyball, PenTool, ImagePlus, Trash2, Sun, Plus, Shirt, Check, Loader2 } from 'lucide-react';
@@ -48,14 +48,29 @@ const PATH_A_MAMA_2 = "M7466.54 1436.61 L6864.35 1436.61 L6777.86 1720.09 L6235.
 const PAPA_PATHS = [PATH_P1, PATH_A1, PATH_P2, PATH_A2];
 const MAMA_PATHS = [PATH_M1, PATH_A_MAMA_1, PATH_M2, PATH_A_MAMA_2];
 
+// --- CACHED BOUNDS (computed once at module load) ---
+const computeBounds = (paths: string[]) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    paths.forEach(p => {
+        const pathObj = new fabric.Path(p);
+        const b = pathObj.getBoundingRect();
+        if (b.left < minX) minX = b.left;
+        if (b.top < minY) minY = b.top;
+        if (b.left + b.width > maxX) maxX = b.left + b.width;
+        if (b.top + b.height > maxY) maxY = b.top + b.height;
+    });
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: minX + (maxX - minX) / 2, cy: minY + (maxY - minY) / 2 };
+};
+
+const PAPA_BOUNDS = computeBounds(PAPA_PATHS);
+const MAMA_BOUNDS = computeBounds(MAMA_PATHS);
+
 export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, onOpenMockup, onTransferToMockup, mockupPrintCount }) => {
     const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
     const [parent] = useAutoAnimate();
     const [images, setImages] = useState<({ id: string; url: string } | null)[]>([null, null, null, null]);
     const [isGrayscale, setIsGrayscale] = useState(false);
     const [brightness, setBrightness] = useState(0);
-    // Deferred brightness for smooth slider + throttled filter application
-    const deferredBrightness = useDeferredValue(brightness);
     const [isBorderEnabled, setIsBorderEnabled] = useState(false);
     const [templateMode, setTemplateMode] = useState<'PAPA' | 'MAMA'>('PAPA');
     const [isTransferring, setIsTransferring] = useState(false);
@@ -100,23 +115,9 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
 
         const currentPaths = templateMode === 'PAPA' ? PAPA_PATHS : MAMA_PATHS;
 
-        // --- NORMALIZATION LOGIC ---
-        // 1. Measure Reference (PAPA) to get target height/center
-        const getBounds = (paths: string[]) => {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            paths.forEach(p => {
-                const pathObj = new fabric.Path(p);
-                const b = pathObj.getBoundingRect();
-                if (b.left < minX) minX = b.left;
-                if (b.top < minY) minY = b.top;
-                if (b.left + b.width > maxX) maxX = b.left + b.width;
-                if (b.top + b.height > maxY) maxY = b.top + b.height;
-            });
-            return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: minX + (maxX - minX) / 2, cy: minY + (maxY - minY) / 2 };
-        };
-
-        const papaBounds = getBounds(PAPA_PATHS);
-        const currentGroupBounds = getBounds(currentPaths);
+        // --- NORMALIZATION LOGIC (using cached bounds) ---
+        const papaBounds = PAPA_BOUNDS;
+        const currentGroupBounds = templateMode === 'PAPA' ? PAPA_BOUNDS : MAMA_BOUNDS;
 
         let adjScale = 1;
         let adjDx = 0;
@@ -328,7 +329,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                         strokeWidth: 9,
                         selectable: false,
                         objectCaching: true, // Enable caching for performance
-                        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.1)', blur: 30, offsetX: 0, offsetY: 20 }),
+                        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.08)', blur: 10, offsetX: 0, offsetY: 10 }),
                         originX: 'center',
                         originY: 'center',
                         scaleX: adjScale,
@@ -391,28 +392,9 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
     }, [renderStructure]); // Dependencies are in useCallback
 
     // --- EFFECT: SMART VISUALS (Brightness / Grayscale) ---
-    useEffect(() => {
-        if (!canvas) return;
-        const objects = canvas.getObjects();
-        let changed = false;
-
-        objects.forEach((obj: any) => {
-            if (obj.data?.type === 'image' && obj.type === 'image') {
-                // Update filters
-                const filters: any[] = [];
-                if (isGrayscale) filters.push(new fabric.filters.Grayscale());
-                if (deferredBrightness !== 0) filters.push(new fabric.filters.Brightness({ brightness: deferredBrightness }));
-
-                // Check if actually changed to avoid redundant apply
-                // Fabric filters comparison is hard, just re-apply.
-                obj.filters = filters;
-                obj.applyFilters();
-                changed = true;
-            }
-        });
-
-        if (changed) canvas.requestRenderAll();
-    }, [canvas, deferredBrightness, isGrayscale, structureVersion]);
+    // NOTE: Removed Fabric.js filters (applyFilters) for performance.
+    // CSS filters are applied to the canvas wrapper instead (see CanvasEditor or wrapper div).
+    // This section is kept for reference but visuals are now handled via CSS on the parent.
 
 
     // --- EFFECT: SMART BORDER ---
@@ -548,7 +530,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
             {/* --- SIDEBAR --- */}
             <aside className="sidebar-panel">
                 <div className="flex justify-center">
-                    <img src="/logo.webp" alt="Logo" className="w-[70px] opacity-80 drop-shadow-xl object-contain" />
+                    <img src="/logo.webp" alt="Logo" className="w-[220px] object-contain" />
                 </div>
 
                 {/* Workspace Switcher */}
@@ -758,6 +740,19 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                         </button>
                     </div>
                 </div>
+
+                {/* Website Link */}
+                <a
+                    href="https://printshopspb.ru/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 py-3 flex items-center justify-center gap-2 text-zinc-400 hover:text-zinc-600 transition-all duration-300 group"
+                >
+                    <span className="text-sm font-medium tracking-wide group-hover:tracking-wider transition-all duration-300">printshopspb.ru</span>
+                    <svg className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                </a>
             </aside>
 
             {/* MAIN CONTENT */}
@@ -775,8 +770,13 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                     </button>
                 </div>
 
-                {/* CANVAS CONTAINER */}
-                <div className={`flex-1 relative overflow-hidden transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
+                {/* CANVAS CONTAINER with CSS filters for GPU-accelerated effects */}
+                <div
+                    className={`flex-1 relative overflow-hidden transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+                    style={{
+                        filter: `${isGrayscale ? 'grayscale(1)' : ''} ${brightness !== 0 ? `brightness(${1 + brightness})` : ''}`.trim() || 'none'
+                    }}
+                >
                     <CanvasEditor
                         onCanvasReady={handleCanvasReady}
                         logicalWidth={8085.14}

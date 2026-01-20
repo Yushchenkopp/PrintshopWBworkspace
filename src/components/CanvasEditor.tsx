@@ -21,7 +21,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
 
     // Drag State
     const [isDragging, setIsDragging] = useState(false);
-    const [isSpacePressed, setIsSpacePressed] = useState(false);
     const lastMousePos = useRef({ x: 0, y: 0 });
 
     const logicalHeightRef = useRef(logicalHeight);
@@ -215,53 +214,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
 
     }, [logicalHeight, logicalWidth]); // Re-run if logical height/width changes
 
-    // 4. Space Key Listener
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.code === 'Space') {
-                // Prevent scrolling if focus is on body/viewport
-                // But allow if user is typing in an input? 
-                // Usually we check document.activeElement
-                if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
-                    return;
-                }
-                e.preventDefault();
-                setIsSpacePressed(true);
-
-                // Disable fabric selection while panning
-                if (canvasInstance.current) {
-                    canvasInstance.current.selection = false;
-                    canvasInstance.current.defaultCursor = 'grab';
-                    canvasInstance.current.hoverCursor = 'grab';
-                    canvasInstance.current.requestRenderAll();
-                }
-            }
-        };
-
-        const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                setIsSpacePressed(false);
-                setIsDragging(false); // Stop dragging if space released
-
-                // Re-enable fabric selection (but keep group selection disabled)
-                if (canvasInstance.current) {
-                    canvasInstance.current.selection = false; // Keep drag selection disabled
-                    canvasInstance.current.defaultCursor = 'default';
-                    canvasInstance.current.hoverCursor = 'move'; // or whatever default
-                    canvasInstance.current.requestRenderAll();
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
-
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
-        };
-    }, []);
+    // 4. Space Key Listener (REMOVED - panning now works with left mouse button)
+    // Kept for potential future use or middle-click panning indicator
 
     // 5. Zoom Logic (Zoom to Point)
     const handleWheel = (e: React.WheelEvent) => {
@@ -295,52 +249,58 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
         setPan({ x: newPanX, y: newPanY });
     };
 
-    // 6. Pan Logic (Drag)
+    // 6. Pan Logic (Drag) - Now works with left mouse button on empty canvas area
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Pan if Space is pressed OR Middle Mouse Button
-        if (isSpacePressed || e.button === 1) {
+        // Pan with Middle Mouse Button (always)
+        if (e.button === 1) {
             setIsDragging(true);
             lastMousePos.current = { x: e.clientX, y: e.clientY };
-            // Important: Stop propagation so Fabric doesn't get the click
-            // But we are on the wrapper. Fabric is inside.
-            // If we are on the wrapper (which covers the canvas?), we need to ensure we don't block Fabric if NOT panning.
-            // The wrapper has the event handler.
-            // If we don't call stopPropagation, it goes down? No, React events bubble UP.
-            // We are on the PARENT.
-            // So if we clicked on Canvas, the event bubbled up to here.
-            // If we want to PREVENT Fabric from acting, we should have captured it?
-            // Or, if we are panning, we just move the div. Fabric will move with it.
-            // The issue is if Fabric ALSO selects an object.
-            // By setting canvas.selection = false in useEffect, we disable selection box.
-            // But object selection on click?
-            // Fabric objects consume events. If we click an object, Fabric handles it and stops propagation usually?
-            // If Fabric stops propagation, this handler might not even run if it's bubbling.
-            // Let's assume we want to override Fabric.
-            // If Space is pressed, we want to PAN, not select.
-            // We can use Capture phase or just rely on the fact that we disabled selection?
-            // Disabling selection only disables the blue box. Objects are still selectable.
-            // To make objects unselectable: canvas.skipTargetFind = true;
+            return;
         }
 
-        // Deselect if clicking background (outside canvas)
-        if (!isSpacePressed && e.button === 0) {
+        // Pan with Left Mouse Button ONLY if clicking on empty space (not on canvas objects)
+        if (e.button === 0) {
             const target = e.target as HTMLElement;
-            // If we clicked something that is NOT the fabric canvas (interaction layer)
-            if (!target.classList.contains('upper-canvas')) {
+            // Check if we clicked on the fabric canvas interaction layer
+            if (target.classList.contains('upper-canvas')) {
+                // Check if there's an object under the cursor
+                const canvas = canvasInstance.current;
+                if (canvas) {
+                    const objectUnderCursor = canvas.findTarget(e.nativeEvent as MouseEvent);
+
+                    // If no object under cursor, start panning
+                    if (!objectUnderCursor) {
+                        setIsDragging(true);
+                        lastMousePos.current = { x: e.clientX, y: e.clientY };
+                        canvas.discardActiveObject();
+                        canvas.requestRenderAll();
+                    }
+                }
+            } else {
+                // Clicked outside canvas (on wrapper), start panning
+                setIsDragging(true);
+                lastMousePos.current = { x: e.clientX, y: e.clientY };
                 canvasInstance.current?.discardActiveObject();
                 canvasInstance.current?.requestRenderAll();
             }
         }
     };
 
-    // Update canvas interactive state based on Space key
+    // Update cursor on canvas when dragging state changes
     useEffect(() => {
         if (canvasInstance.current) {
-            // When Space is pressed, we want to disable interaction with objects
-            canvasInstance.current.skipTargetFind = isSpacePressed;
+            if (isDragging) {
+                canvasInstance.current.defaultCursor = 'grabbing';
+                canvasInstance.current.hoverCursor = 'grabbing';
+            } else {
+                canvasInstance.current.defaultCursor = 'default';
+                canvasInstance.current.hoverCursor = 'move';
+            }
             canvasInstance.current.requestRenderAll();
         }
-    }, [isSpacePressed]);
+    }, [isDragging]);
+
+
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (!isDragging) return;
@@ -367,7 +327,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
     return (
         <div
             ref={viewportRef}
-            className={`w-full h-full overflow-hidden bg-transparent relative ${isSpacePressed ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'}`}
+            className={`w-full h-full overflow-hidden bg-transparent relative ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
