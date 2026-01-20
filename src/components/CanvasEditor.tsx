@@ -268,8 +268,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ onCanvasReady, logic
                 if (canvas) {
                     const objectUnderCursor = canvas.findTarget(e.nativeEvent as MouseEvent);
 
-                    // If no object under cursor, start panning
-                    if (!objectUnderCursor) {
+                    // Start panning if no object, or if object is not selectable (e.g., placeholder)
+                    if (!objectUnderCursor || !(objectUnderCursor as any).selectable) {
                         setIsDragging(true);
                         lastMousePos.current = { x: e.clientX, y: e.clientY };
                         canvas.discardActiveObject();

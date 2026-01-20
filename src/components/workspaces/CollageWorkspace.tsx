@@ -58,6 +58,8 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
     // Deferred value for smooth slider + throttled canvas updates
     const deferredSignatureScale = useDeferredValue(signatureScale);
     const [isTransferring, setIsTransferring] = useState(false);
+    // Ref for detecting drag vs click on placeholder
+    const placeholderMouseDownPos = useRef<{ x: number; y: number } | null>(null);
     const [isTransferSuccess, setIsTransferSuccess] = useState(false);
     const [layoutVariant, setLayoutVariant] = useState<'default' | 'asymmetric'>('default'); // New State
 
@@ -723,7 +725,20 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                     <CanvasEditor onCanvasReady={handleCanvasReady} logicalHeight={logicalCanvasHeight} autoZoomOnResize={shouldAutoZoom}>
                         {images.length === 0 && (
                             <div
-                                onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
+                                onMouseDown={(e) => {
+                                    placeholderMouseDownPos.current = { x: e.clientX, y: e.clientY };
+                                }}
+                                onMouseUp={(e) => {
+                                    if (!placeholderMouseDownPos.current) return;
+                                    const distance = Math.sqrt(
+                                        Math.pow(e.clientX - placeholderMouseDownPos.current.x, 2) +
+                                        Math.pow(e.clientY - placeholderMouseDownPos.current.y, 2)
+                                    );
+                                    if (distance < 10) {
+                                        document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+                                    }
+                                    placeholderMouseDownPos.current = null;
+                                }}
                                 className="absolute cursor-pointer group flex flex-col items-center justify-center border-4 border-solid border-zinc-200 bg-white/50 backdrop-blur-xl rounded-3xl shadow-xl hover:bg-white/60 transition-colors duration-200"
                                 style={{
                                     width: '2160px', // CONTENT_WIDTH
@@ -737,7 +752,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                         )}
                     </CanvasEditor>
                 </div>
-            </main>
+            </main >
         </div >
     );
 };

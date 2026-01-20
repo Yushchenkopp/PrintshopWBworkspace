@@ -345,9 +345,25 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
                         data: { type: 'placeholder', index: i }
                     } as any);
 
-                    // Add Events
-                    // Events: Removed hover effects for performance
-                    group.on('mousedown', () => { fileInputsRefs.current[i]?.click(); });
+                    // Add Events - using screen coordinates to detect drag vs click
+                    let mouseDownPos: { x: number; y: number } | null = null;
+                    group.on('mousedown', (e) => {
+                        const evt = e.e as MouseEvent;
+                        mouseDownPos = { x: evt.clientX, y: evt.clientY };
+                    });
+                    group.on('mouseup', (e) => {
+                        if (!mouseDownPos) return;
+                        const evt = e.e as MouseEvent;
+                        const distance = Math.sqrt(
+                            Math.pow(evt.clientX - mouseDownPos.x, 2) +
+                            Math.pow(evt.clientY - mouseDownPos.y, 2)
+                        );
+                        // Only trigger click if mouse didn't move much (not a pan)
+                        if (distance < 10) {
+                            fileInputsRefs.current[i]?.click();
+                        }
+                        mouseDownPos = null;
+                    });
 
                     resolve([group]);
                 }

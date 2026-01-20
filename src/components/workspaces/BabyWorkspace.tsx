@@ -57,6 +57,8 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
     const [scaleX, setScaleX] = useState<number>(1);
     const [scaleY, setScaleY] = useState<number>(1);
     const [signatureScale, setSignatureScale] = useState<number>(1);
+    // Ref for detecting drag vs click on placeholder
+    const placeholderMouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
     // Listen for selection changes to update zoom slider
     useEffect(() => {
@@ -752,7 +754,20 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                     <CanvasEditor onCanvasReady={handleCanvasReady} logicalHeight={logicalCanvasHeight} autoZoomOnResize={shouldAutoZoom}>
                         {images.length === 0 && (
                             <div
-                                onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
+                                onMouseDown={(e) => {
+                                    placeholderMouseDownPos.current = { x: e.clientX, y: e.clientY };
+                                }}
+                                onMouseUp={(e) => {
+                                    if (!placeholderMouseDownPos.current) return;
+                                    const distance = Math.sqrt(
+                                        Math.pow(e.clientX - placeholderMouseDownPos.current.x, 2) +
+                                        Math.pow(e.clientY - placeholderMouseDownPos.current.y, 2)
+                                    );
+                                    if (distance < 10) {
+                                        document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+                                    }
+                                    placeholderMouseDownPos.current = null;
+                                }}
                                 className="absolute cursor-pointer group flex flex-col items-center justify-center border-4 border-solid border-zinc-200 bg-white/50 backdrop-blur-xl rounded-3xl shadow-xl hover:bg-white/60 transition-colors duration-200"
                                 style={{
                                     width: '2160px', // CONTENT_WIDTH

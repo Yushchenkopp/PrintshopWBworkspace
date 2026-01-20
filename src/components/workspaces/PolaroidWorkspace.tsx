@@ -441,8 +441,24 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
                             });
                         });
 
-                        group.on('mousedown', () => {
-                            document.getElementById(`polaroid-upload-${i}`)?.click();
+                        // Add Events - using screen coordinates to detect drag vs click
+                        let mouseDownPos: { x: number; y: number } | null = null;
+                        group.on('mousedown', (e) => {
+                            const evt = e.e as MouseEvent;
+                            mouseDownPos = { x: evt.clientX, y: evt.clientY };
+                        });
+                        group.on('mouseup', (e) => {
+                            if (!mouseDownPos) return;
+                            const evt = e.e as MouseEvent;
+                            const distance = Math.sqrt(
+                                Math.pow(evt.clientX - mouseDownPos.x, 2) +
+                                Math.pow(evt.clientY - mouseDownPos.y, 2)
+                            );
+                            // Only trigger click if mouse didn't move much (not a pan)
+                            if (distance < 10) {
+                                document.getElementById(`polaroid-upload-${i}`)?.click();
+                            }
+                            mouseDownPos = null;
                         });
                         bottomLayer.push(group);
                     }
