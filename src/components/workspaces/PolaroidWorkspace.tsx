@@ -115,7 +115,7 @@ export const PolaroidWorkspace: React.FC<PolaroidWorkspaceProps> = ({ onSwitchTe
 
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        const blob = await generateHighResBlob(canvas);
+        const blob = await generateHighResBlob(canvas, { brightness: brightness });
 
         setIsTransferring(false);
 

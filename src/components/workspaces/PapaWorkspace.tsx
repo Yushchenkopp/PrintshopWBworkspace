@@ -504,7 +504,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
         // and ensure browser paints the spinner frame.
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        const blob = await generateHighResBlob(canvas);
+        const blob = await generateHighResBlob(canvas, { grayscale: isGrayscale, brightness: brightness });
 
         setIsTransferring(false);
 
@@ -538,7 +538,7 @@ export const PapaWorkspace: React.FC<PapaWorkspaceProps> = ({ onSwitchTemplate, 
     };
 
     const handleDownload = async () => {
-        if (canvas) await exportHighRes(canvas);
+        if (canvas) await exportHighRes(canvas, { grayscale: isGrayscale, brightness: brightness });
     };
 
     return (

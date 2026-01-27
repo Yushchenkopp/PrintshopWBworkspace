@@ -596,7 +596,12 @@ export const BabyWorkspace: React.FC<BabyWorkspaceProps> = ({ onSwitchTemplate, 
                                         className={`w-6 h-6 rounded-full border border-zinc-300 bg-black cursor-pointer transition-all ${textColor === '#000000' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
                                     />
                                     <button
-                                        onClick={() => setTextColor('#FFFFFF')}
+                                        onClick={() => {
+                                            setTextColor('#FFFFFF');
+                                            // Auto-enable border when switching to white text
+                                            setVisualBorderEnabled(true);
+                                            setIsBorderEnabled(true);
+                                        }}
                                         className={`w-6 h-6 rounded-full border border-zinc-300 bg-white cursor-pointer transition-all ${textColor === '#FFFFFF' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
                                     />
                                 </div>

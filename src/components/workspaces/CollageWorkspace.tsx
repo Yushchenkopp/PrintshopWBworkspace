@@ -121,7 +121,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
 
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        const blob = await generateHighResBlob(canvas);
+        const blob = await generateHighResBlob(canvas, { grayscale: isBWEnabled, brightness: brightness });
 
         setIsTransferring(false);
 
@@ -538,7 +538,12 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                                         className={`w-6 h-6 rounded-full border border-zinc-300 bg-black cursor-pointer transition-all ${textColor === '#000000' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
                                     />
                                     <button
-                                        onClick={() => setTextColor('#FFFFFF')}
+                                        onClick={() => {
+                                            setTextColor('#FFFFFF');
+                                            // Auto-enable border when switching to white text
+                                            setVisualBorderEnabled(true);
+                                            setIsBorderEnabled(true);
+                                        }}
                                         className={`w-6 h-6 rounded-full border border-zinc-300 bg-white cursor-pointer transition-all ${textColor === '#FFFFFF' ? 'ring-2 ring-zinc-900 ring-offset-2' : 'hover:scale-110'}`}
                                     />
                                 </div>
@@ -686,7 +691,7 @@ export const CollageWorkspace: React.FC<CollageWorkspaceProps> = ({ onSwitchTemp
                             </AnimatePresence>
                         </button>
                         <button
-                            onClick={() => canvas && exportHighRes(canvas)}
+                            onClick={() => canvas && exportHighRes(canvas, { grayscale: isBWEnabled, brightness: brightness })}
                             className="h-12 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-zinc-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                         >
                             <ArrowDownToLine className="w-4 h-4" />

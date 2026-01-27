@@ -2,6 +2,11 @@ import UPNG from 'upng-js';
 import * as fabric from 'fabric';
 import * as iq from 'imageq';
 
+export interface ExportOptions {
+    grayscale?: boolean;
+    brightness?: number;
+}
+
 // Helper to set DPI in PNG Blob
 export const setDpi = (blob: Blob, dpi: number): Promise<Blob> => {
     return new Promise((resolve) => {
@@ -85,15 +90,21 @@ const crc32 = (buf: Uint8Array): number => {
 };
 
 
-// Helper to load DataURL to Canvas
-const loadDataURLToCanvas = (dataURL: string): Promise<HTMLCanvasElement> => {
+// Helper to load DataURL to Canvas with optional Filter
+const loadDataURLToCanvas = (dataURL: string, filter?: string): Promise<HTMLCanvasElement> => {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
             const c = document.createElement('canvas');
             c.width = img.width;
             c.height = img.height;
-            c.getContext('2d')?.drawImage(img, 0, 0);
+            const ctx = c.getContext('2d');
+            if (ctx) {
+                if (filter && filter !== 'none') {
+                    ctx.filter = filter;
+                }
+                ctx.drawImage(img, 0, 0);
+            }
             resolve(c);
         };
         img.onerror = reject;
@@ -183,10 +194,20 @@ const smartQuantize = (imgData: ImageData, numColors: number): ImageData => {
     }
 };
 
-export const generateHighResBlob = async (canvas: fabric.Canvas): Promise<Blob | null> => {
+export const generateHighResBlob = async (canvas: fabric.Canvas, options?: ExportOptions): Promise<Blob | null> => {
     if (!canvas) return null;
 
     try {
+        // Construct CSS filter string for 2D context
+        let filterString = 'none';
+        if (options) {
+            const filters = [];
+            if (options.grayscale) filters.push('grayscale(1)');
+            if (options.brightness !== undefined && options.brightness !== 0) {
+                filters.push(`brightness(${1 + options.brightness})`);
+            }
+            if (filters.length > 0) filterString = filters.join(' ');
+        }
         // 1. Save current state
         const originalViewport = canvas.viewportTransform;
 
@@ -264,7 +285,7 @@ export const generateHighResBlob = async (canvas: fabric.Canvas): Promise<Blob |
         }
 
         // 7. Process Pixel-Perfect Trim
-        const fullCanvas = await loadDataURLToCanvas(dataURL);
+        const fullCanvas = await loadDataURLToCanvas(dataURL, filterString);
         const trimmedCanvas = trimTransparency(fullCanvas);
 
         // 8. Convert to Blob (Optimized with UPNG)
@@ -297,8 +318,8 @@ export const generateHighResBlob = async (canvas: fabric.Canvas): Promise<Blob |
     }
 };
 
-export const exportHighRes = async (canvas: fabric.Canvas) => {
-    const blob = await generateHighResBlob(canvas);
+export const exportHighRes = async (canvas: fabric.Canvas, options?: ExportOptions) => {
+    const blob = await generateHighResBlob(canvas, options);
     if (!blob) {
         alert("Не удалось сохранить файл. Попробуйте еще раз.");
         return;
